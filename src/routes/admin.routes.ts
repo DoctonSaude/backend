@@ -1574,32 +1574,6 @@ router.post('/pharmacies', ...adminAuth, async (req, res) => {
   }
 });
 
-router.put('/pharmacies/:id', ...adminAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, status, cnpj, address } = req.body;
-
-    const updated = await prisma.pharmacy.update({
-      where: { id },
-      data: {
-        name: name !== undefined ? name : undefined,
-        cnpj: cnpj !== undefined ? cnpj : undefined,
-        address: address !== undefined ? address : undefined,
-        isApproved: status === 'Ativo' ? true : (status === 'Inativo' ? false : undefined),
-      },
-    });
-
-    res.json({
-      id: updated.id,
-      name: updated.name,
-      status: updated.isApproved ? 'Ativo' : 'Inativo',
-    });
-  } catch (error) {
-    console.error('Erro ao atualizar farmácia:', error);
-    res.status(500).json({ error: 'Erro interno ao atualizar farmácia' });
-  }
-});
-
 router.put('/pharmacies/:id/approve', ...adminAuth, async (req, res) => {
   try {
     const updated = await prisma.pharmacy.update({
@@ -1625,6 +1599,32 @@ router.put('/pharmacies/:id/approve', ...adminAuth, async (req, res) => {
     res.json({ message: 'Farmácia aprovada', pharmacy: updated });
   } catch (err) {
     res.status(404).json({ error: 'Farmácia não encontrada' });
+  }
+});
+
+router.put('/pharmacies/:id', ...adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, status, cnpj, address } = req.body;
+
+    const updated = await prisma.pharmacy.update({
+      where: { id },
+      data: {
+        name: name !== undefined ? name : undefined,
+        cnpj: cnpj !== undefined ? cnpj : undefined,
+        address: address !== undefined ? address : undefined,
+        isApproved: status === 'Ativo' ? true : (status === 'Inativo' ? false : undefined),
+      },
+    });
+
+    res.json({
+      id: updated.id,
+      name: updated.name,
+      status: updated.isApproved ? 'Ativo' : 'Inativo',
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar farmácia:', error);
+    res.status(500).json({ error: 'Erro interno ao atualizar farmácia' });
   }
 });
 
