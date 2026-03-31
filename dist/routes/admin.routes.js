@@ -1334,6 +1334,165 @@ router.put('/partners/:partnerId/approve', ...adminAuth, (req, res) => {
         }
     })();
 });
+// --- Pharmacy Management ---
+router.get('/pharmacies/pending', ...adminAuth, async (req, res) => {
+    try {
+        const pendingPharmacies = await prisma_js_1.default.pharmacy.findMany({
+            where: { isApproved: false },
+            include: {
+                users: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        const mapped = pendingPharmacies.map((p) => ({
+            id: p.id,
+            name: p.name || 'Farmácia',
+            cnpj: p.cnpj || 'Não informado',
+            contactName: p.users?.[0]?.name || 'N/A',
+            contactEmail: p.users?.[0]?.email || 'N/A',
+            requestDate: p.createdAt.toISOString(),
+            status: 'Pendente'
+        }));
+        res.json(mapped);
+    }
+    catch (error) {
+        console.error('Erro ao buscar farmácias pendentes:', error);
+        res.status(500).json({ error: 'Erro ao buscar aprovações pendentes' });
+    }
+});
+router.get('/pharmacies', ...adminAuth, async (req, res) => {
+    try {
+        const dbPharmacies = await prisma_js_1.default.pharmacy.findMany({
+            include: {
+                users: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        const mapped = dbPharmacies.map((p) => ({
+            id: p.id,
+            name: p.name || 'Farmácia',
+            email: p.users?.[0]?.email || '',
+            status: p.isApproved ? 'Ativo' : 'Inativo',
+            registrationDate: new Date(p.createdAt).toLocaleDateString('pt-BR'),
+            cnpj: p.cnpj,
+            phone: p.users?.[0]?.phone || '',
+            address: p.address,
+        }));
+        res.json(mapped);
+    }
+    catch (error) {
+        console.error('Erro ao listar farmácias:', error);
+        res.json([]);
+    }
+});
+router.post('/pharmacies', ...adminAuth, async (req, res) => {
+    try {
+        const { name, email, cnpj, phone, address, status } = req.body;
+        if (!name)
+            return res.status(400).json({ error: 'Nome é obrigatório' });
+        const bcrypt = (await Promise.resolve().then(() => __importStar(require('bcryptjs')))).default;
+        const hashed = await bcrypt.hash(Math.random().toString(36).slice(2) + 'A#1', 10);
+        const createdPharmacy = await prisma_js_1.default.pharmacy.create({
+            data: {
+                name,
+                cnpj: cnpj || null,
+                address: address || null,
+                isApproved: status === 'Ativo',
+            }
+        });
+        await prisma_js_1.default.user.create({
+            data: {
+                name,
+                email: String(email || `${Date.now()}@farmacia.docton.com`).trim().toLowerCase(),
+                password: hashed,
+                role: 'PHARMACY',
+                phone: phone ? String(phone).trim() : null,
+                pharmacyId: createdPharmacy.id
+            },
+        });
+        res.status(201).json({
+            id: createdPharmacy.id,
+            name: createdPharmacy.name,
+            status: createdPharmacy.isApproved ? 'Ativo' : 'Inativo',
+            registrationDate: new Date().toLocaleDateString('pt-BR'),
+        });
+    }
+    catch (error) {
+        console.error('Erro ao criar farmácia:', error);
+        res.status(500).json({ error: 'Erro interno ao criar farmácia' });
+    }
+});
+router.put('/pharmacies/:id', ...adminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, status, cnpj, address } = req.body;
+        const updated = await prisma_js_1.default.pharmacy.update({
+            where: { id },
+            data: {
+                name: name !== undefined ? name : undefined,
+                cnpj: cnpj !== undefined ? cnpj : undefined,
+                address: address !== undefined ? address : undefined,
+                isApproved: status === 'Ativo' ? true : (status === 'Inativo' ? false : undefined),
+            },
+        });
+        res.json({
+            id: updated.id,
+            name: updated.name,
+            status: updated.isApproved ? 'Ativo' : 'Inativo',
+        });
+    }
+    catch (error) {
+        console.error('Erro ao atualizar farmácia:', error);
+        res.status(500).json({ error: 'Erro interno ao atualizar farmácia' });
+    }
+});
+router.put('/pharmacies/:id/approve', ...adminAuth, async (req, res) => {
+    try {
+        const updated = await prisma_js_1.default.pharmacy.update({
+            where: { id: req.params.id },
+            data: { isApproved: true },
+            include: { users: true }
+        });
+        // Notificar os usuários da farmácia sobre a aprovação
+        if (updated.users && updated.users.length > 0) {
+            for (const user of updated.users) {
+                await inAppNotification_service_js_1.default.createNotification({
+                    userId: user.id,
+                    type: 'system',
+                    title: '✅ Cadastro de Farmácia Aprovado!',
+                    message: 'O cadastro da sua farmácia foi aprovado. Agora você pode acessar o painel da farmácia.',
+                    priority: 'high',
+                    link: '/pharmacy/dashboard'
+                }).catch(err => console.error('Erro ao notificar usuário de farmácia sobre aprovação:', err));
+            }
+        }
+        res.json({ message: 'Farmácia aprovada', pharmacy: updated });
+    }
+    catch (err) {
+        res.status(404).json({ error: 'Farmácia não encontrada' });
+    }
+});
+router.delete('/pharmacies/:id', ...adminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pharmacy = await prisma_js_1.default.pharmacy.findUnique({
+            where: { id },
+            include: { users: true }
+        });
+        if (!pharmacy)
+            return res.status(404).json({ error: 'Farmácia não encontrada' });
+        // Deletar usuários da farmácia
+        for (const user of pharmacy.users) {
+            await prisma_js_1.default.user.delete({ where: { id: user.id } });
+        }
+        await prisma_js_1.default.pharmacy.delete({ where: { id } });
+        res.json({ success: true, pharmacyId: id });
+    }
+    catch (error) {
+        console.error('Erro ao excluir farmácia:', error);
+        res.status(500).json({ error: 'Erro ao excluir farmácia' });
+    }
+});
 router.get('/challenges', auth_js_1.authenticate, (0, auth_js_1.authorize)('ADMIN'), (req, res) => {
     (async () => {
         try {

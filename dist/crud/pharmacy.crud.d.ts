@@ -7,6 +7,10 @@ export declare const PharmacyCrud: {
         id: string;
         name: string;
         tenantId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        cnpj: string | null;
+        isApproved: boolean;
         address: string | null;
     }>;
     /**
@@ -92,6 +96,10 @@ export declare const PharmacyCrud: {
         id: string;
         name: string;
         tenantId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        cnpj: string | null;
+        isApproved: boolean;
         address: string | null;
     })[]>;
     /**

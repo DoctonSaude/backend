@@ -58,8 +58,7 @@ export declare class PatientService {
             gender: string | null;
             cpf: string | null;
             bloodType: string | null;
-            allergies: string | null;
-            allergiesArray: string[];
+            allergies: string[];
             chronicDiseases: string[];
             currentMedications: string[];
             medications: string | null;
@@ -82,6 +81,8 @@ export declare class PatientService {
             referredBy: string | null;
             totalChallengesCompleted: number;
             totalBadgesEarned: number;
+            userIntent: string | null;
+            userPriority: string | null;
             blockchainAddress: string | null;
             encryptionPublicKey: string | null;
         };

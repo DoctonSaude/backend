@@ -35,7 +35,7 @@ class LoyaltyService {
                     points,
                     action,
                     description,
-                    metadata
+                    metadataJson: metadata
                 }
             });
         });

@@ -237,6 +237,8 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
     const { password, name, role = 'PATIENT', phone } = req.body;
     const email = req.body.email?.toLowerCase().trim();
     
+    logger.info(`--- INICIANDO REGISTRO (V1.0.2) --- Role: ${role}`);
+
     logger.info('[auth] Iniciando tentativa de registro', { 
       email, 
       name, 

@@ -31,6 +31,7 @@ exports.UserCrud = {
             where: { email },
             include: {
                 partner: true,
+                pharmacy: true,
                 patient: {
                     include: {
                         subscriptions: {

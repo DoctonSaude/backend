@@ -7,9 +7,11 @@ exports.allowedOrigins = [
     'https://admin.docton.com.br',
     'https://parceiro.docton.com.br',
     'https://docton.com.br',
+    'https://api.docton.com.br',
     'https://doctonsaude.com.br',
     'https://docton-website.vercel.app',
     'http://app.docton.com.br',
+    'http://api.docton.com.br',
 ];
 // Adicionar origens extras via variável de ambiente (sem crashar se mal formatada)
 try {

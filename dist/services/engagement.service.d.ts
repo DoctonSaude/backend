@@ -22,12 +22,12 @@ export declare class EngagementService {
         frequency: string | null;
         points: number;
         icon: string | null;
+        imageUrl: string | null;
         targetValue: number | null;
         difficulty: string | null;
         estimatedTime: number | null;
         createdBy: string | null;
         sponsor: string | null;
-        imageUrl: string | null;
         approvalStatus: string | null;
     }[]>;
     createChallenge(data: any, partnerId: string): Promise<{
@@ -45,12 +45,12 @@ export declare class EngagementService {
         frequency: string | null;
         points: number;
         icon: string | null;
+        imageUrl: string | null;
         targetValue: number | null;
         difficulty: string | null;
         estimatedTime: number | null;
         createdBy: string | null;
         sponsor: string | null;
-        imageUrl: string | null;
         approvalStatus: string | null;
     }>;
     updateChallenge(id: string, data: any, partnerId: string): Promise<{
@@ -68,12 +68,12 @@ export declare class EngagementService {
         frequency: string | null;
         points: number;
         icon: string | null;
+        imageUrl: string | null;
         targetValue: number | null;
         difficulty: string | null;
         estimatedTime: number | null;
         createdBy: string | null;
         sponsor: string | null;
-        imageUrl: string | null;
         approvalStatus: string | null;
     }>;
     deleteChallenge(id: string, partnerId: string): Promise<{
@@ -91,12 +91,12 @@ export declare class EngagementService {
         frequency: string | null;
         points: number;
         icon: string | null;
+        imageUrl: string | null;
         targetValue: number | null;
         difficulty: string | null;
         estimatedTime: number | null;
         createdBy: string | null;
         sponsor: string | null;
-        imageUrl: string | null;
         approvalStatus: string | null;
     }>;
     getSettings(partnerId: string): Promise<any>;

@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.errorHandler = exports.ConflictError = exports.NotFoundError = exports.AuthorizationError = exports.AuthenticationError = exports.ValidationError = exports.AppError = void 0;
+const cors_js_1 = require("../config/cors.js");
 /**
  * Classe base para erros da aplicação
  */
@@ -151,11 +152,16 @@ const logError = (err, req) => {
 const errorHandler = (err, req, res, next) => {
     // Garantir headers de CORS em caso de erro para evitar bloqueio no frontend
     const origin = req.headers.origin;
-    if (origin) {
+    const isAllowed = origin && (cors_js_1.allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production');
+    if (isAllowed) {
         res.header('Access-Control-Allow-Origin', origin);
         res.header('Access-Control-Allow-Credentials', 'true');
         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Tenant-Id, Cache-Control, Pragma');
+    }
+    else if (!origin && process.env.NODE_ENV === 'production') {
+        // Fallback seguro em produção para o app principal se o header sumir
+        res.header('Access-Control-Allow-Origin', 'https://app.docton.com.br');
     }
     // Preflight check
     if (req.method === 'OPTIONS') {

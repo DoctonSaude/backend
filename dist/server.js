@@ -145,6 +145,21 @@ exports.app.use('/api/auth', authLimiter);
 // 2. Body & Cookies
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.use(express_1.default.json({ limit: '10mb' }));
+// Middleware de captura de erro de JSON malformado
+exports.app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
+        logger_js_1.logger.error('[JSON Parse Error] Payload malformado detectado:', {
+            error: err.message,
+            ip: req.ip,
+            path: req.path
+        });
+        return res.status(400).json({
+            error: 'Corpo da requisição JSON malformado',
+            message: err.message
+        });
+    }
+    next();
+});
 exports.app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 exports.app.use((0, express_mongo_sanitize_1.default)());
 exports.app.use((0, hpp_1.default)());

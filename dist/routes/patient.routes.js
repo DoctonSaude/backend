@@ -69,6 +69,25 @@ const validate = (schema) => (req, res, next) => {
         return res.status(400).json({ error: 'Erro de validação', details: error.errors });
     }
 };
+// Rota para logs de analytics do paciente
+router.post('/analytics', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const { event, properties } = req.body;
+        await prisma_js_1.default.analyticsEvent.create({
+            data: {
+                event,
+                propertiesJson: properties,
+                userId: req.user?.userId,
+                timestamp: new Date()
+            }
+        });
+        res.status(201).json({ success: true });
+    }
+    catch (error) {
+        console.error('[Analytics Error]', error);
+        res.status(500).json({ error: 'Erro ao registrar evento' });
+    }
+});
 // Rotas de Suporte para Pacientes
 // Listar tickets de suporte do paciente
 router.get('/support/tickets', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res, next) => {
@@ -630,6 +649,21 @@ router.get('/daily-tasks', auth_js_1.authenticate, (0, auth_js_1.authorize)('PAT
         res.status(500).json({ error: 'Erro ao buscar tarefas diárias' });
     }
 });
+// Listar dicas de saúde (Health Tips)
+router.get('/health-tips', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const tips = await prisma_js_1.default.healthTip.findMany({
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+        });
+        res.json(tips);
+    }
+    catch (error) {
+        console.error('Erro ao buscar dicas de saúde:', error);
+        res.status(500).json({ error: 'Erro ao buscar dicas de saúde' });
+    }
+});
 // Marcar tarefa como concluída e ganhar pontos
 router.patch('/daily-tasks/:id/complete', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
     try {
@@ -1021,11 +1055,11 @@ router.post('/onboarding', auth_js_1.authenticate, (0, auth_js_1.authorize)('PAT
             where: { id: patient.id },
             data: {
                 bloodType,
-                allergies: Array.isArray(allergies) ? { set: allergies } : { set: [] },
-                chronicDiseases: Array.isArray(chronicDiseases) ? { set: chronicDiseases } : { set: [] },
-                currentMedications: Array.isArray(currentMedications) ? { set: currentMedications } : { set: [] },
+                allergies: Array.isArray(allergies) ? allergies : (allergies ? [String(allergies)] : []),
+                chronicDiseases: Array.isArray(chronicDiseases) ? chronicDiseases : [],
+                currentMedications: Array.isArray(currentMedications) ? currentMedications : [],
                 lifestyle: lifestyle || {},
-                healthGoals: Array.isArray(healthGoals) ? { set: healthGoals } : { set: [] },
+                healthGoals: Array.isArray(healthGoals) ? healthGoals : [],
                 userIntent: userIntent || null,
                 userPriority: userPriority || null,
                 archetype,
@@ -1538,6 +1572,68 @@ router.delete('/medication-reminders/:id', auth_js_1.authenticate, (0, auth_js_1
     catch (error) {
         console.error('Erro ao excluir lembrete:', error);
         res.status(500).json({ error: 'Erro ao excluir lembrete' });
+    }
+});
+// Logs de Medicação (Gamificação / Adesão)
+router.get('/medication-logs', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
+        if (!patient)
+            return res.status(404).json({ error: 'Paciente não encontrado' });
+        const logs = await prisma_js_1.default.medicationLog.findMany({
+            where: { patientId: patient.id },
+            orderBy: { scheduledTime: 'desc' }
+        });
+        res.json(logs);
+    }
+    catch (error) {
+        console.error('Erro ao buscar logs de medicação:', error);
+        res.status(500).json({ error: 'Erro ao buscar logs de medicação' });
+    }
+});
+router.post('/medication-logs', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
+        if (!patient)
+            return res.status(404).json({ error: 'Paciente não encontrado' });
+        const { medicationName, dosage, scheduledTime, status, notes } = req.body;
+        // Check if log already exists for this exact medication and scheduled time
+        const existingLog = await prisma_js_1.default.medicationLog.findFirst({
+            where: {
+                patientId: patient.id,
+                medicationName,
+                scheduledTime: new Date(scheduledTime)
+            }
+        });
+        let result;
+        if (existingLog) {
+            result = await prisma_js_1.default.medicationLog.update({
+                where: { id: existingLog.id },
+                data: {
+                    status,
+                    takenTime: status === 'taken' ? new Date() : null,
+                    notes
+                }
+            });
+        }
+        else {
+            result = await prisma_js_1.default.medicationLog.create({
+                data: {
+                    patientId: patient.id,
+                    medicationName,
+                    dosage: dosage || '',
+                    scheduledTime: new Date(scheduledTime),
+                    status,
+                    takenTime: status === 'taken' ? new Date() : null,
+                    notes
+                }
+            });
+        }
+        res.status(200).json(result);
+    }
+    catch (error) {
+        console.error('Erro ao salvar log de medicação:', error);
+        res.status(500).json({ error: 'Erro ao salvar log de medicação' });
     }
 });
 // Exportar PDF

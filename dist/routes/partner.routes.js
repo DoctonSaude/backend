@@ -14,7 +14,6 @@ const chatbot_service_js_1 = require("../services/chatbot.service.js");
 const inAppNotification_service_js_1 = __importDefault(require("../services/inAppNotification.service.js"));
 const gamification_service_js_1 = require("../services/gamification.service.js");
 const storage_service_js_1 = require("../services/storage.service.js");
-const supabase_js_1 = require("../lib/supabase.js");
 const validationCode_service_js_1 = require("../services/validationCode.service.js");
 const router = (0, express_1.Router)();
 const upload = (0, multer_1.default)({
@@ -75,43 +74,71 @@ const mapPartnerData = (p) => {
 // Lista todos os parceiros (para pacientes buscarem serviços) - ROTA PÚBLICA
 router.get('/', async (req, res, next) => {
     try {
-        const { data, error } = await supabase_js_1.supabase
-            .from('Partner')
-            .select('*, user:User(name, email, avatar), services:PartnerService(*)')
-            .eq('isApproved', true)
-            .order('createdAt', { ascending: false });
-        if (error)
-            throw error;
-        const mappedDb = data.map(mapPartnerData);
-        return res.json(mappedDb);
+        let partners;
+        try {
+            partners = await prisma_js_1.default.partner.findMany({
+                where: { isApproved: true },
+                include: {
+                    user: { select: { name: true, email: true, avatar: true } },
+                    services: { where: { isActive: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+        catch (innerErr) {
+            console.error('[Partners GET /] Fallback sem services:', innerErr?.message);
+            partners = await prisma_js_1.default.partner.findMany({
+                where: { isApproved: true },
+                include: { user: { select: { name: true, email: true, avatar: true } } },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+        return res.json(partners.map(mapPartnerData));
     }
     catch (error) {
+        console.error('[Partners GET /] Erro fatal:', error?.message);
         next(error);
     }
 });
-// Busca parceiros com filtro simples por termo (especialidade, nome, cidade, estado) - ROTA PÚBLICA
+// Busca parceiros com filtro por termo - ROTA PÚBLICA
 router.get('/search', async (req, res, next) => {
     const q = req.query.q?.trim();
     if (!q)
         return res.json([]);
-    // Simplificando: PostgREST .or() pode ser sensível a aspas se não houver caracteres especiais como vírgulas
-    const term = `%${q.toLowerCase()}%`;
     try {
-        const { data, error } = await supabase_js_1.supabase
-            .from('Partner')
-            .select('*, user:User(name, email, avatar), services:PartnerService(*)')
-            // .eq('isApproved', true) // Removido temporariamente para diagnóstico
-            .or(`specialty.ilike.${term},city.ilike.${term},state.ilike.${term},name.ilike.${term}`)
-            .order('createdAt', { ascending: false });
-        console.log(`[Search] Query: "${q}", Total no banco (independente de aprovação): ${data?.length || 0}`);
-        if (error) {
-            console.error('[Search] Erro Supabase:', error);
-            throw error;
+        let partners;
+        const whereClause = {
+            OR: [
+                { specialty: { contains: q, mode: 'insensitive' } },
+                { city: { contains: q, mode: 'insensitive' } },
+                { state: { contains: q, mode: 'insensitive' } },
+                { name: { contains: q, mode: 'insensitive' } },
+                { user: { name: { contains: q, mode: 'insensitive' } } }
+            ]
+        };
+        try {
+            partners = await prisma_js_1.default.partner.findMany({
+                where: whereClause,
+                include: {
+                    user: { select: { name: true, email: true, avatar: true } },
+                    services: { where: { isActive: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
         }
-        const mappedDb = data.map(mapPartnerData);
-        return res.json(mappedDb);
+        catch (innerErr) {
+            console.error(`[Partners /search] Fallback sem services para "${q}":`, innerErr?.message);
+            partners = await prisma_js_1.default.partner.findMany({
+                where: whereClause,
+                include: { user: { select: { name: true, email: true, avatar: true } } },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+        console.log(`[Search] Query: "${q}", Total: ${partners.length}`);
+        return res.json(partners.map(mapPartnerData));
     }
     catch (err) {
+        console.error(`[Partners /search] Erro fatal para "${q}":`, err?.message);
         next(err);
     }
 });
@@ -989,19 +1016,37 @@ router.get('/availability', auth_js_1.authenticate, async (req, res, next) => {
                 return res.status(404).json({ error: 'Paciente não encontrado' });
             where.patientId = patient.id;
         }
-        const requests = await prisma_js_1.default.availabilityRequest.findMany({
-            where,
-            include: {
-                patient: { include: { user: { select: { name: true, avatar: true } } } },
-                partner: {
-                    include: {
-                        user: { select: { name: true, avatar: true } },
-                        services: { where: { isActive: true } } // Incluir serviços para o mapPartnerData funcionar corretamente
+        let requests;
+        try {
+            requests = await prisma_js_1.default.availabilityRequest.findMany({
+                where,
+                include: {
+                    patient: { include: { user: { select: { name: true, avatar: true } } } },
+                    partner: {
+                        include: {
+                            user: { select: { name: true, avatar: true } },
+                            services: { where: { isActive: true } }
+                        }
                     }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+        catch (innerErr) {
+            console.error('[Availability GET] Fallback sem services:', innerErr?.message);
+            requests = await prisma_js_1.default.availabilityRequest.findMany({
+                where,
+                include: {
+                    patient: { include: { user: { select: { name: true, avatar: true } } } },
+                    partner: {
+                        include: {
+                            user: { select: { name: true, avatar: true } }
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
         const mappedRequests = requests.map(r => ({
             ...r,
             partner: mapPartnerData(r.partner)

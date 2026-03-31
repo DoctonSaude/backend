@@ -61,13 +61,22 @@ const registerValidation = [
     (0, express_validator_1.body)('email').isEmail().withMessage('Email inválido'),
     (0, express_validator_1.body)('password').isLength({ min: 6 }).withMessage('Senha deve ter pelo menos 6 caracteres'),
     (0, express_validator_1.body)('name').trim().isLength({ min: 3 }).withMessage('Nome deve ter pelo menos 3 caracteres'),
-    (0, express_validator_1.body)('role').optional().isIn(['PATIENT', 'PARTNER', 'ADMIN']).withMessage('Role inválido'),
+    (0, express_validator_1.body)('role').optional().isIn(['PATIENT', 'PARTNER', 'ADMIN', 'PHARMACY']).withMessage('Role inválido'),
 ];
 // Middleware para tratamento de erros de validação
 function handleValidationErrors(req, res, next) {
     const errors = (0, express_validator_1.validationResult)(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        const errorArray = errors.array();
+        logger_js_1.logger.warn('[auth] Erro de validação detectado:', {
+            path: req.path,
+            errors: errorArray,
+            body: { ...req.body, password: '***' }
+        });
+        return res.status(400).json({
+            error: 'Erro de validação',
+            details: errorArray
+        });
     }
     next();
 }
@@ -134,6 +143,11 @@ router.post('/login', loginValidation, handleValidationErrors, async (req, res, 
             userWithoutPassword.isApproved = user.partner?.isApproved ?? false;
             userWithoutPassword.partnerType = user.partner?.type ?? 'INDIVIDUAL';
         }
+        // Anexar status de aprovação de farmácia
+        if (user.role === 'PHARMACY') {
+            userWithoutPassword.isApproved = user.pharmacy?.isApproved ?? false;
+            userWithoutPassword.pharmacyName = user.pharmacy?.name ?? '';
+        }
         // Anexar plano e onboarding se for PATIENT
         if (user.role === 'PATIENT') {
             const patient = user.patient;
@@ -168,6 +182,7 @@ router.get('/validate', async (req, res, next) => {
                     where: { id: userId },
                     include: {
                         partner: true,
+                        pharmacy: true,
                         patient: {
                             include: {
                                 subscriptions: {
@@ -187,6 +202,11 @@ router.get('/validate', async (req, res, next) => {
                 if (user.role === 'PARTNER') {
                     userWithoutPassword.isApproved = user.partner?.isApproved ?? false;
                     userWithoutPassword.partnerType = user.partner?.type ?? 'INDIVIDUAL';
+                }
+                // Anexar status de aprovação de farmácia
+                if (user.role === 'PHARMACY') {
+                    userWithoutPassword.isApproved = user.pharmacy?.isApproved ?? false;
+                    userWithoutPassword.pharmacyName = user.pharmacy?.name ?? '';
                 }
                 // Anexar plano e onboarding se for PATIENT
                 if (user.role === 'PATIENT') {
@@ -219,6 +239,13 @@ router.post('/register', registerValidation, handleValidationErrors, async (req,
     try {
         const { password, name, role = 'PATIENT', phone } = req.body;
         const email = req.body.email?.toLowerCase().trim();
+        logger_js_1.logger.info('[auth] Iniciando tentativa de registro', {
+            email,
+            name,
+            role,
+            hasPhone: !!phone,
+            ip: req.headers['x-forwarded-for'] || req.ip || '127.0.0.1'
+        });
         if (!email)
             return res.status(400).json({ error: 'Email é obrigatório' });
         const ip = req.headers['x-forwarded-for'] || req.ip || '127.0.0.1';
@@ -297,23 +324,70 @@ router.post('/register', registerValidation, handleValidationErrors, async (req,
                 link: '/admin/aprovacoes'
             }).catch(err => console.error('Erro ao notificar admin sobre novo parceiro:', err));
         }
-        else if (role === 'PATIENT' || role === 'ADMIN') {
-            if (role === 'PATIENT') {
-                const tempCpf = `TEMP-${Date.now()}`;
-                await prisma_js_1.default.patient.create({
-                    data: {
-                        userId: newUser.id,
-                        cpf: tempCpf,
-                        birthDate: new Date(),
-                    }
-                }).catch(err => console.error('Erro ao criar registro de paciente:', err));
-            }
+        else if (role === 'PATIENT') {
+            const tempCpf = `TEMP-${Date.now()}`;
+            await prisma_js_1.default.patient.create({
+                data: {
+                    userId: newUser.id,
+                    cpf: tempCpf,
+                    birthDate: new Date(),
+                }
+            }).catch(err => console.error('Erro ao criar registro de paciente:', err));
         }
-        const { password: _, ...userWithoutPassword } = newUser;
+        else if (role === 'PHARMACY') {
+            const { pharmacyName, cnpj } = req.body;
+            let pharmacy;
+            try {
+                pharmacy = await prisma_js_1.default.pharmacy.create({
+                    data: {
+                        name: pharmacyName || name,
+                        cnpj: cnpj || null,
+                        isApproved: false
+                    }
+                });
+            }
+            catch (pharmacyError) {
+                logger_js_1.logger.error('[auth] Erro ao criar registro de farmácia:', {
+                    error: pharmacyError.message,
+                    code: pharmacyError.code,
+                    pharmacyName,
+                    cnpj
+                });
+                // Se for erro de P2002 (Unique constraint), damos um erro mais amigável
+                if (pharmacyError.code === 'P2002') {
+                    return res.status(400).json({ error: 'Este CNPJ já está cadastrado para outra farmácia.' });
+                }
+                throw pharmacyError;
+            }
+            // Vincular usuário à farmácia
+            await prisma_js_1.default.user.update({
+                where: { id: newUser.id },
+                data: { pharmacyId: pharmacy.id }
+            });
+            // Notificar Admin sobre a nova farmácia
+            await inAppNotification_service_js_1.default.createNotification({
+                userId: null,
+                type: 'pharmacy_approval',
+                title: '💊 Nova Farmácia Registrada',
+                message: `${pharmacyName || newUser.name} se cadastrou como farmácia e aguarda aprovação.`,
+                priority: 'high',
+                link: '/admin/farmacias'
+            }).catch(err => console.error('Erro ao notificar admin sobre nova farmácia:', err));
+        }
+        const updatedUser = await prisma_js_1.default.user.findUnique({
+            where: { id: newUser.id },
+            include: { pharmacy: true, partner: true, patient: true }
+        });
+        const { password: _, ...userWithoutPassword } = updatedUser || newUser;
         // Anexar status de aprovação de parceiro (sempre falso no registro novo)
         if (role === 'PARTNER') {
             userWithoutPassword.isApproved = false;
             userWithoutPassword.partnerType = req.body.partnerType || 'INDIVIDUAL';
+        }
+        // Anexar status de aprovação de farmácia
+        if (role === 'PHARMACY') {
+            userWithoutPassword.isApproved = false;
+            userWithoutPassword.pharmacyName = req.body.pharmacyName || name;
         }
         // Gera JWT para login automático após registro
         const token = jsonwebtoken_1.default.sign({ userId: newUser.id, role: newUser.role, email: newUser.email }, String(env_js_1.env.JWT_SECRET), { expiresIn: env_js_1.env.JWT_EXPIRES_IN });
