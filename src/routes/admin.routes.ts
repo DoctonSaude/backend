@@ -1218,6 +1218,7 @@ router.get('/partners/pending', ...adminAuth, async (req, res) => {
         status: d.status
       })),
       status: 'Pendente',
+      isApproved: false, // Adicionado explicitamente
       type: 'PARTNER'
     }));
 
@@ -1228,8 +1229,9 @@ router.get('/partners/pending', ...adminAuth, async (req, res) => {
       contactName: p.users?.[0]?.name || 'N/A',
       contactEmail: p.users?.[0]?.email || 'N/A',
       requestDate: p.createdAt.toISOString(),
-      documents: [], // Farmácias podem não ter docs na tabela PartnerDocument ainda
+      documents: [],
       status: 'Pendente',
+      isApproved: false, // Adicionado explicitamente
       type: 'PHARMACY'
     }));
 
@@ -1517,7 +1519,8 @@ router.get('/pharmacies', ...adminAuth, async (req, res) => {
       name: p.name || 'Farmácia',
       email: p.users?.[0]?.email || '',
       status: p.isApproved ? 'Ativo' : 'Inativo',
-      createdAt: p.createdAt.toISOString(), // Mudado de registrationDate para createdAt
+      isApproved: p.isApproved, // Adicionado para lógica do frontend
+      createdAt: p.createdAt.toISOString(),
       cnpj: p.cnpj,
       phone: p.users?.[0]?.phone || '',
       address: p.address,
