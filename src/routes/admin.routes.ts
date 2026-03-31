@@ -1195,7 +1195,15 @@ router.get('/partners/pending', ...adminAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    const mapped = pendingPartners.map((p) => ({
+    const pendingPharmacies = await prisma.pharmacy.findMany({
+      where: { isApproved: false },
+      include: {
+        users: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const mappedPartners = pendingPartners.map((p) => ({
       id: p.id,
       name: p.user?.name || p.name || 'Parceiro',
       cnpj: p.cnpj || 'Não informado',
@@ -1209,8 +1217,25 @@ router.get('/partners/pending', ...adminAuth, async (req, res) => {
         url: d.url,
         status: d.status
       })),
-      status: 'Pendente'
+      status: 'Pendente',
+      type: 'PARTNER'
     }));
+
+    const mappedPharmacies = pendingPharmacies.map((p) => ({
+      id: p.id,
+      name: p.name || 'Farmácia',
+      cnpj: p.cnpj || 'Não informado',
+      contactName: p.users?.[0]?.name || 'N/A',
+      contactEmail: p.users?.[0]?.email || 'N/A',
+      requestDate: p.createdAt.toISOString(),
+      documents: [], // Farmácias podem não ter docs na tabela PartnerDocument ainda
+      status: 'Pendente',
+      type: 'PHARMACY'
+    }));
+
+    const mapped = [...mappedPartners, ...mappedPharmacies].sort((a, b) => 
+      new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()
+    );
 
     res.json(mapped);
   } catch (error) {
@@ -1467,7 +1492,7 @@ router.get('/pharmacies/pending', ...adminAuth, async (req, res) => {
       cnpj: p.cnpj || 'Não informado',
       contactName: p.users?.[0]?.name || 'N/A',
       contactEmail: p.users?.[0]?.email || 'N/A',
-      requestDate: p.createdAt.toISOString(),
+      createdAt: p.createdAt.toISOString(), // Mudado de requestDate para createdAt
       status: 'Pendente'
     }));
 
@@ -1492,7 +1517,7 @@ router.get('/pharmacies', ...adminAuth, async (req, res) => {
       name: p.name || 'Farmácia',
       email: p.users?.[0]?.email || '',
       status: p.isApproved ? 'Ativo' : 'Inativo',
-      registrationDate: new Date(p.createdAt).toLocaleDateString('pt-BR'),
+      createdAt: p.createdAt.toISOString(), // Mudado de registrationDate para createdAt
       cnpj: p.cnpj,
       phone: p.users?.[0]?.phone || '',
       address: p.address,
