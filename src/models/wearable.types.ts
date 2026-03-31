@@ -1,0 +1,32 @@
+export enum WearableProvider {
+    APPLE_HEALTH = "APPLE_HEALTH",
+    GOOGLE_FIT = "GOOGLE_FIT",
+    FITBIT = "FITBIT",
+    GARMIN = "GARMIN",
+    WHOOP = "WHOOP",
+    OURA = "OURA",
+    POLAR = "POLAR",
+    SAMSUNG_HEALTH = "SAMSUNG_HEALTH",
+}
+
+export enum WearableDataType {
+    HEART_RATE = "HEART_RATE",
+    BLOOD_PRESSURE = "BLOOD_PRESSURE",
+    SPO2 = "SPO2",
+    STEPS = "STEPS",
+    CALORIES = "CALORIES",
+    SLEEP = "SLEEP",
+    ACTIVITY = "ACTIVITY",
+    TEMPERATURE = "TEMPERATURE",
+    WEIGHT = "WEIGHT",
+    ECG = "ECG",
+    BLOOD_GLUCOSE = "BLOOD_GLUCOSE",
+}
+
+export enum ConnectionStatus {
+    PENDING = "PENDING",
+    CONNECTED = "CONNECTED",
+    DISCONNECTED = "DISCONNECTED",
+    ERROR = "ERROR",
+    EXPIRED = "EXPIRED",
+}

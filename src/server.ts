@@ -1,4 +1,5 @@
 console.log('!!! BOOTSTRAP STARTING !!! ', new Date().toISOString());
+console.log('REDIS_URL (masked):', process.env.REDIS_URL ? process.env.REDIS_URL.replace(/:[^@]+@/, ':****@') : 'MISSING');
 
 // Triggering restart after .env change
 import 'dotenv/config';
@@ -8,34 +9,50 @@ import 'dotenv/config';
   return this.toString();
 };
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 export const app = express();
+
+// Trust proxy para Railway/produção (necessário para rate-limit com X-Forwarded-For)
+app.set('trust proxy', 1);
 
 // A saúde mais rápida possível, sem dependências
 app.get('/api/ping', (req, res) => res.status(200).send('PONG'));
 
-// Logger e CORS Fail-safe inicial
+import cors from 'cors';
+import { env } from './config/env.js';
+import { allowedOrigins } from './config/cors.js';
+
+// 1. CORS Middleware (CARREGAR NO TOPO)
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir requests sem origin (como apps mobile ou curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Bloqueado: ${origin}`);
+      callback(new Error('Não permitido pelo CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Tenant-Id', 'Cache-Control', 'Pragma'],
+  maxAge: 86400
+}));
+
+// Middleware de diagnóstico (OPCIONAL)
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  console.log(`[REQ] ${req.method} ${req.path} | Origin: ${origin}`);
-
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Tenant-Id');
+  if (req.headers.origin) {
+    res.setHeader('X-CORS-Diagnostic', 'Checked');
   }
-
-  if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
 
 import { createServer } from 'http';
 import { SocketService } from './lib/socket.js';
-import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env.js';
 import apiRouter from './routes/index.js';
 import rateLimit from 'express-rate-limit';
 import mongoSanitize from 'express-mongo-sanitize';
@@ -74,68 +91,6 @@ app.get('/', (_req, res) => {
   });
 });
 
-const allowedOrigins = [
-  'https://app.docton.com.br',
-  'https://doctonsaude.com.br',
-  'https://docton.com.br',
-  'https://admin.docton.com.br',
-  'https://parceiro.docton.com.br',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  ...(env.CORS_ORIGIN ? env.CORS_ORIGIN.split(',').map(o => o.trim()) : [])
-].filter((val): val is string => Boolean(val));
-
-// 1. CORS Configuration
-app.use(cors({
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Permitir requisições sem origin (como mobile apps ou curl)
-    if (!origin) return callback(null, true);
-
-    // Em desenvolvimento, permitir tudo
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-
-    const normalizedOrigin = origin.replace(/\/$/, '');
-
-    // Verificar se o origin termina com .docton.com.br ou .doctonsaude.com.br
-    const isDomainMatch = normalizedOrigin.endsWith('.docton.com.br') ||
-      normalizedOrigin.endsWith('.doctonsaude.com.br') ||
-      normalizedOrigin === 'https://docton.com.br' ||
-      normalizedOrigin === 'https://doctonsaude.com.br';
-
-    const isExplicitlyAllowed = allowedOrigins.some(o => {
-      const normalizedAllowed = o.replace(/\/$/, '');
-      return normalizedOrigin === normalizedAllowed;
-    });
-
-    if (isDomainMatch || isExplicitlyAllowed) {
-      callback(null, true);
-    } else {
-      logger.warn(`[CORS] Origin blocked: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Tenant-Id'],
-  exposedHeaders: ['Set-Cookie'],
-  credentials: true,
-  maxAge: 86400
-}));
-
-// 1.5 Preflight robusto - Resposta estática para CORS
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Tenant-Id');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  res.sendStatus(204);
-});
-
 // 2. Security & Limiters
 app.use(helmet({
   contentSecurityPolicy: {
@@ -144,7 +99,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.doctonsaude.com.br", "https://api.docton.com.br", "https://doctonsaude.com.br", "https://docton.com.br", "http://localhost:3001"],
+      connectSrc: ["'self'", "https://*.docton.com.br", "https://*.doctonsaude.com.br", "http://localhost:3001"],
     },
   },
 }));
@@ -166,13 +121,29 @@ const authLimiter = rateLimit({
 
 app.use('/api/', limiter);
 app.use('/api/auth', authLimiter);
-app.use(mongoSanitize());
-app.use(hpp());
 
-// 3. Body & Cookies
+// 2. Body & Cookies
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
+// Middleware de captura de erro de JSON malformado
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof SyntaxError && 'status' in err && (err as any).status === 400 && 'body' in err) {
+    logger.error('[JSON Parse Error] Payload malformado detectado:', {
+      error: err.message,
+      ip: req.ip,
+      path: req.path
+    });
+    return res.status(400).json({ 
+      error: 'Corpo da requisição JSON malformado', 
+      message: err.message 
+    });
+  }
+  next();
+});
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use(mongoSanitize());
+app.use(hpp());
 
 // 4. i18n Middleware
 app.use(i18nMiddleware.handle(i18next));

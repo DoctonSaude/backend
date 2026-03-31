@@ -1,0 +1,143 @@
+{
+  "navigation": {
+    "home": "Início",
+    "about": "Sobre",
+    "services": "Serviços",
+    "patients": "Pacientes",
+    "professionals": "Profissionais",
+    "clinics": "Clínicas",
+    "pricing": "Preços",
+    "contact": "Contato",
+    "blog": "Blog",
+    "careers": "Carreiras",
+    "login": "Entrar",
+    "signup": "Cadastrar"
+  },
+  "hero": {
+    "title": "Revolucione sua experiência de saúde",
+    "subtitle": "A plataforma completa que conecta pacientes e profissionais através da tecnologia mais avançada em telemedicina",
+    "cta": "Começar Agora",
+    "ctaSecondary": "Ver Planos"
+  },
+  "features": {
+    "telemedicine": {
+      "title": "Telemedicina Avançada",
+      "description": "Consultas por videochamada com especialistas de todo o Brasil"
+    },
+    "scheduling": {
+      "title": "Agendamento Inteligente",
+      "description": "Marque consultas 24/7 com confirmação automática"
+    },
+    "records": {
+      "title": "Prontuário Digital",
+      "description": "Seu histórico médico seguro e acessível a qualquer momento"
+    },
+    "prescriptions": {
+      "title": "Receitas Digitais",
+      "description": "Prescrições eletrônicas válidas em todo o território nacional"
+    }
+  },
+  "testimonials": {
+    "title": "O que nossos pacientes dizem",
+    "subtitle": "Milhares de vidas transformadas pela tecnologia Docton"
+  },
+  "pricing": {
+    "title": "Planos para todas as necessidades",
+    "subtitle": "Escolha o plano ideal para você ou sua clínica",
+    "monthly": "Mensal",
+    "yearly": "Anual",
+    "save": "Economize 20%",
+    "popular": "Mais Popular",
+    "start": "Começar",
+    "contact": "Falar com Vendas"
+  },
+  "contact": {
+    "title": "Entre em contato",
+    "subtitle": "Estamos aqui para ajudar você",
+    "form": {
+      "name": "Nome Completo",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "subject": "Assunto",
+      "message": "Mensagem",
+      "send": "Enviar Mensagem"
+    },
+    "departments": {
+      "support": "Suporte",
+      "sales": "Vendas",
+      "partnerships": "Parcerias",
+      "press": "Imprensa"
+    }
+  },
+  "footer": {
+    "description": "Transformando a saúde através da tecnologia e inovação",
+    "quickLinks": "Links Rápidos",
+    "services": "Serviços",
+    "company": "Empresa",
+    "legal": "Legal",
+    "social": "Redes Sociais",
+    "copyright": "© 2024 Docton Saúde. Todos os direitos reservados.",
+    "privacy": "Política de Privacidade",
+    "terms": "Termos de Uso",
+    "cookies": "Política de Cookies"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Ocorreu um erro",
+    "success": "Sucesso!",
+    "retry": "Tentar Novamente",
+    "close": "Fechar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Salvar",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "view": "Visualizar",
+    "download": "Baixar",
+    "share": "Compartilhar",
+    "copy": "Copiar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "page": "Página",
+    "of": "de",
+    "results": "resultados",
+    "noResults": "Nenhum resultado encontrado",
+    "required": "Campo obrigatório",
+    "optional": "Opcional",
+    "yes": "Sim",
+    "no": "Não"
+  },
+  "accessibility": {
+    "skipToContent": "Pular para o conteúdo principal",
+    "skipToNavigation": "Pular para a navegação",
+    "skipToFooter": "Pular para o rodapé",
+    "menuOpen": "Abrir menu",
+    "menuClose": "Fechar menu",
+    "searchOpen": "Abrir busca",
+    "searchClose": "Fechar busca",
+    "language": "Idioma",
+    "theme": "Tema",
+    "darkMode": "Modo Escuro",
+    "lightMode": "Modo Claro"
+  },
+  "seo": {
+    "defaultTitle": "Docton Saúde - Revolucione sua experiência de saúde",
+    "defaultDescription": "A plataforma completa que conecta pacientes e profissionais através da tecnologia mais avançada em telemedicina. Agendamento online, consultas por videochamada e prontuário digital.",
+    "keywords": "telemedicina, consulta médica online, agendamento médico, prontuário digital, plataforma médica"
+  },
+  "errors": {
+    "404": {
+      "title": "Página não encontrada",
+      "description": "Desculpe, a página que você está procurando não existe ou foi movida.",
+      "action": "Voltar para a página inicial"
+    },
+    "500": {
+      "title": "Erro interno do servidor",
+      "description": "Ocorreu um erro inesperado. Nossa equipe já foi notificada.",
+      "action": "Tentar novamente"
+    }
+  }
+}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifique seu Email - Docton Saúde</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: #ffffff;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    h1 {
+      color: #1a202c;
+      margin: 0 0 10px 0;
+      font-size: 24px;
+    }
+    .subtitle {
+      color: #718096;
+      font-size: 16px;
+      margin-bottom: 30px;
+    }
+    .content {
+      margin: 30px 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 14px 32px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .button:hover {
+      opacity: 0.9;
+    }
+    .link {
+      color: #667eea;
+      word-break: break-all;
+      font-size: 12px;
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f7fafc;
+      border-radius: 8px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      color: #718096;
+      font-size: 14px;
+    }
+    .warning {
+      background-color: #fff5f5;
+      border-left: 4px solid #fc8181;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">DS</div>
+      <h1>Verifique seu Email</h1>
+      <p class="subtitle">Olá, {{name}}! Bem-vindo ao Docton Saúde</p>
+    </div>
+
+    <div class="content">
+      <p>Obrigado por se cadastrar! Para ativar sua conta e começar a usar a plataforma, clique no botão abaixo para verificar seu endereço de email:</p>
+
+      <div style="text-align: center;">
+        <a href="{{verificationUrl}}" class="button">Verificar Email</a>
+      </div>
+
+      <div class="warning">
+        <strong>⚠️ Importante:</strong> Este link expira em 24 horas. Se você não solicitou este cadastro, pode ignorar este email.
+      </div>
+
+      <p style="font-size: 14px; color: #718096;">Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+      <div class="link">{{verificationUrl}}</div>
+    </div>
+
+    <div class="footer">
+      <p>Este é um email automático, por favor não responda.</p>
+      <p>&copy; 2025 Docton Saúde. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>
+

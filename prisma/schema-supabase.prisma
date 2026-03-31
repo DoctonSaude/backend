@@ -1,0 +1,467 @@
+// SUPABASE-OPTIMIZED SCHEMA FOR DOCTON HEALTH PLATFORM
+// This schema integrates with Supabase Auth and uses Supabase-specific features
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../lib/generated/prisma"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("SUPABASE_DATABASE_URL") // Use Supabase connection string
+  directUrl = env("SUPABASE_DIRECT_URL")
+}
+
+// Supabase Auth users table (read-only reference)
+model AuthUser {
+  id               String    @id // Maps to auth.users.id
+  email            String    @unique
+  phone            String?
+  emailConfirmed   Boolean   @default(false)
+  phoneConfirmed   Boolean   @default(false)
+  lastSignInAt     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations to our extended profiles
+  patientProfile   Patient?
+  pharmacyProfile  Pharmacy?
+  adminProfile     Admin?
+  
+  @@map("auth.users")
+}
+
+// Extended User Profiles
+model Patient {
+  id              String    @id @default(cuid())
+  userId          String    @unique // Foreign key to auth.users
+  authUser        AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Information
+  name            String
+  cpf             String    @unique
+  birthDate       DateTime
+  gender          String    // male, female, other
+  phone           String?
+  avatar          String?   // URL to Supabase Storage
+  
+  // Address (with geolocation)
+  address         String?
+  city            String
+  state           String
+  postalCode      String?
+  coordinates     Json?     // {lat: -16.6864, lng: -49.2643}
+  
+  // Health Information
+  bloodType       String?
+  allergies       String[]  @default([])
+  medications     String[]  @default([])
+  conditions      String[]  @default([])
+  
+  // Preferences
+  preferredPharmacy String?
+  notifications   Json      // Notification preferences
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  prescriptions   Prescription[]
+  orders          Order[]
+  appointments    Appointment[]
+  reviews         Review[]
+  
+  @@index([city])
+  @@index([state])
+  @@index([coordinates])
+  @@map("patients")
+}
+
+model Pharmacy {
+  id              String    @id @default(cuid())
+  userId          String    @unique // Foreign key to auth.users
+  authUser        AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Basic Information
+  name            String
+  cnpj            String    @unique
+  phone           String
+  email           String
+  website         String?
+  
+  // Location (critical for ranking and delivery)
+  address         String
+  city            String
+  state           String
+  postalCode      String
+  coordinates     Json      // {lat: -16.6864, lng: -49.2643}
+  
+  // Business Information
+  openingHours    Json      // Opening hours by day
+  specialties     String[]  // Pharmacy specialties
+  services        String[]  // Delivery, compounding, etc.
+  
+  // Ranking and Performance
+  rating          Float     @default(0)
+  reviewCount     Int       @default(0)
+  deliveryTime    Int?      // Average delivery time in minutes
+  deliveryFee     Float     @default(0)
+  
+  // Integration
+  isActive        Boolean   @default(true)
+  verified        Boolean   @default(false)
+  apiKey          String?   @unique // For API integration
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  staff           PharmacyStaff[]
+  inventory       Inventory[]
+  orders          Order[]
+  reviews         Review[]
+  quotes          Quote[]
+  
+  @@index([city])
+  @@index([state])
+  @@index([coordinates])
+  @@index([rating])
+  @@index([isActive])
+  @@map("pharmacies")
+}
+
+model Admin {
+  id              String    @id @default(cuid())
+  userId          String    @unique // Foreign key to auth.users
+  authUser        AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name            String
+  role            String    // super_admin, support, moderation
+  permissions     String[]  // Granular permissions
+  lastLoginAt     DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("admins")
+}
+
+// Healthcare Models
+model Prescription {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Prescription Details
+  doctorName      String
+  doctorCRM       String
+  prescriptionDate DateTime
+  validUntil      DateTime
+  
+  // Medications
+  medications     Json      // Array of medication objects
+  
+  // Digital Version
+  imageUrl        String?   // Supabase Storage URL
+  pdfUrl          String?   // Supabase Storage URL
+  isDigital       Boolean   @default(true)
+  
+  // Status
+  status          String    @default("active") // active, expired, used
+  usesRemaining   Int?      // For medications with limited uses
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([status])
+  @@index([validUntil])
+  @@map("prescriptions")
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  orderNumber     String    @unique @default(cuid())
+  
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacyId      String
+  pharmacy        Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  
+  // Order Items
+  items           Json      // Array of medication objects
+  
+  // Pricing
+  subtotal        Float
+  deliveryFee     Float     @default(0)
+  totalAmount     Float
+  
+  // Delivery Information
+  deliveryAddress Json
+  deliveryCoords  Json?     // {lat: -16.6864, lng: -49.2643}
+  deliveryTime    Int?      // Estimated minutes
+  scheduledFor    DateTime?
+  
+  // Status Tracking
+  status          String    @default("pending") // pending, confirmed, preparing, ready, delivered, cancelled
+  paymentStatus   String    @default("pending") // pending, paid, failed, refunded
+  trackingCode    String?
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deliveredAt     DateTime?
+  
+  // Relations
+  reviews         Review[]
+  chatMessages    ChatMessage[]
+  
+  @@index([patientId])
+  @@index([pharmacyId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model Appointment {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Appointment Details
+  type            String    // consultation, exam, vaccination
+  specialty       String?
+  doctorName      String?
+  doctorCRM       String?
+  
+  // Scheduling
+  scheduledFor    DateTime
+  duration        Int       @default(30) // minutes
+  
+  // Location
+  location        Json      // Physical or telemedicine
+  
+  // Status
+  status          String    @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
+  
+  // Digital Integration
+  meetingLink     String?   // For telemedicine
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@map("appointments")
+}
+
+// Pharmacy Operations
+model PharmacyStaff {
+  id              String    @id @default(cuid())
+  pharmacyId      String
+  pharmacy        Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  
+  userId          String    // Reference to auth.users (can be null for non-system users)
+  name            String
+  role            String    // pharmacist, technician, delivery
+  email           String?
+  phone           String?
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([pharmacyId])
+  @@map("pharmacy_staff")
+}
+
+model Inventory {
+  id              String    @id @default(cuid())
+  pharmacyId      String
+  pharmacy        Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  
+  // Medication Info
+  medicationName  String
+  laboratory      String?
+  dosage          String?
+  form            String?   // tablet, capsule, liquid
+  
+  // Stock
+  quantity        Int       @default(0)
+  minQuantity     Int       @default(0) // Alert threshold
+  maxQuantity     Int?
+  unitPrice       Float
+  salePrice       Float
+  
+  // Control
+  requiresPrescription Boolean @default(false)
+  controlled      Boolean   @default(false)
+  batchNumber     String?
+  expiryDate      DateTime?
+  
+  // Timestamps
+  lastRestock     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([pharmacyId, medicationName, dosage, form])
+  @@index([pharmacyId])
+  @@index([quantity])
+  @@map("inventory")
+}
+
+// Quote System (Backend-specific)
+model Quote {
+  id              String    @id @default(cuid())
+  patientId       String    // Can be null for anonymous quotes
+  
+  // Quote Request
+  medications     Json      // Array of requested medications
+  deliveryAddress Json
+  deliveryCoords  Json?
+  
+  // Responses from Pharmacies
+  responses       Json      // Array of pharmacy responses
+  
+  // Status
+  status          String    @default("pending") // pending, receiving, completed, expired
+  
+  // Validity
+  validUntil      DateTime  @default(dbgenerated("(now() + interval '24 hours')"))
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([patientId])
+  @@index([status])
+  @@index([validUntil])
+  @@map("quotes")
+}
+
+// Reviews and Ratings
+model Review {
+  id              String    @id @default(cuid())
+  
+  // Review Target
+  pharmacyId      String?
+  pharmacy        Pharmacy? @relation(fields: [pharmacyId], references: [id])
+  
+  orderId         String?
+  order           Order?    @relation(fields: [orderId], references: [id])
+  
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id])
+  
+  // Review Content
+  rating          Int       // 1-5 stars
+  comment         String?
+  images          String[]  // URLs to Supabase Storage
+  
+  // Moderation
+  status          String    @default("published") // published, hidden, flagged
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([pharmacyId])
+  @@index([patientId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+// Notifications (Realtime ready)
+model Notification {
+  id              String    @id @default(cuid())
+  userId          String    // Reference to auth.users
+  
+  // Content
+  title           String
+  message         String
+  type            String    // order_update, promotion, reminder, system
+  
+  // Delivery
+  channels        String[]  @default(["app"]) // app, email, sms, push
+  readAt          DateTime?
+  
+  // Metadata
+  metadata        Json?     // Additional data for the notification
+  
+  // Timestamps
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([readAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+// System Configuration
+model SystemConfig {
+  id              String    @id @default(cuid())
+  key             String    @unique
+  value           Json
+  description     String?
+  isPublic        Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("system_config")
+}
+
+// Audit Log (Security)
+model AuditLog {
+  id              String    @id @default(cuid())
+  userId          String?   // Reference to auth.users
+  
+  action          String
+  resource        String
+  resourceId      String?
+  
+  // Details
+  oldValues       Json?
+  newValues       Json?
+  metadata        Json?
+  
+  // Request Info
+  ipAddress       String?
+  userAgent       String?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Real-time chat between patients and pharmacies
+model ChatMessage {
+  id          String   @id @default(cuid())
+  orderId     String
+  senderId    String
+  senderType  String   // 'patient' or 'pharmacy'
+  message     String
+  messageType String   @default("text") // 'text', 'image', 'document'
+  fileUrl     String?  // For image/document messages
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}

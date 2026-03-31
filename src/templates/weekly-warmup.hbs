@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sua Semana de Saúde</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+    
+    <!-- Header com Gradiente -->
+    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0 0 10px 0; font-size: 32px; font-weight: bold;">
+        🔥 Sua Semana Começa Agora!
+      </h1>
+      <p style="color: #d1fae5; margin: 0; font-size: 16px;">
+        Olá, {{userName}}! Vamos conquistar novos objetivos juntos.
+      </p>
+    </div>
+
+    <!-- Estatísticas Pessoais -->
+    <div style="padding: 30px; background-color: #f9fafb;">
+      <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 24px;">📊 Seu Progresso</h2>
+      <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 150px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="color: #ffffff; font-size: 32px; font-weight: bold;">{{healthPoints}}</div>
+          <div style="color: #dbeafe; font-size: 14px; margin-top: 5px;">HealthPoints</div>
+        </div>
+        <div style="flex: 1; min-width: 150px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="color: #ffffff; font-size: 32px; font-weight: bold;">{{currentLevel}}</div>
+          <div style="color: #fef3c7; font-size: 14px; margin-top: 5px;">Nível</div>
+        </div>
+        <div style="flex: 1; min-width: 150px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="color: #ffffff; font-size: 32px; font-weight: bold;">{{currentStreak}}</div>
+          <div style="color: #fecaca; font-size: 14px; margin-top: 5px;">Dias Consecutivos</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desafio em Destaque -->
+    {{#if featuredChallenge}}
+    <div style="padding: 30px; border-top: 1px solid #e5e7eb;">
+      <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 24px;">🌟 Desafio em Destaque</h2>
+      <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 25px; border-radius: 12px; border-left: 4px solid #f59e0b;">
+        <div style="font-size: 48px; margin-bottom: 15px;">{{featuredChallenge.icon}}</div>
+        <h3 style="color: #92400e; margin: 0 0 10px 0; font-size: 20px; font-weight: bold;">
+          {{featuredChallenge.title}}
+        </h3>
+        <p style="color: #78350f; margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
+          {{featuredChallenge.description}}
+        </p>
+        <div style="background-color: #ffffff; padding: 10px 15px; border-radius: 8px; display: inline-block;">
+          <span style="color: #f59e0b; font-weight: bold; font-size: 16px;">
+            +{{featuredChallenge.points}} pontos
+          </span>
+        </div>
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- Desafios Recomendados -->
+    {{#if recommendedChallenges}}
+    <div style="padding: 30px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+      <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 24px;">🎯 Recomendados para Você</h2>
+      {{#each recommendedChallenges}}
+      <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 2px solid #e5e7eb;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <div style="font-size: 36px;">{{this.icon}}</div>
+          <div style="flex: 1;">
+            <h4 style="margin: 0 0 5px 0; color: #1f2937; font-size: 16px; font-weight: bold;">{{this.title}}</h4>
+            <p style="margin: 0; color: #6b7280; font-size: 13px;">{{this.description}}</p>
+          </div>
+          <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; padding: 8px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">
+            +{{this.points}}
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    <!-- CTA Principal -->
+    <div style="padding: 40px 30px; text-align: center; background-color: #ffffff;">
+      <a href="{{appUrl}}/patient/desafios" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+        🚀 Ver Meus Desafios
+      </a>
+      <p style="color: #6b7280; margin: 20px 0 0 0; font-size: 14px;">
+        Acesse agora e comece sua semana com energia!
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding: 30px; background-color: #1f2937; text-align: center;">
+      <p style="color: #9ca3af; margin: 0 0 10px 0; font-size: 14px;">
+        💚 Gestão Saúde - Sua jornada de saúde começa aqui
+      </p>
+      <p style="color: #6b7280; margin: 0; font-size: 12px;">
+        Não quer mais receber esses e-mails? 
+        <a href="{{appUrl}}/settings" style="color: #10b981; text-decoration: none;">Gerenciar preferências</a>
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

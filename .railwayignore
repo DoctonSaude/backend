@@ -1,0 +1,12 @@
+# Ignore files that should not be uploaded to Railway
+node_modules/
+*.log
+*.env.development
+*.env.local
+.env.development
+.env.local
+.vercel/
+.runtime/
+backend_errors.log
+server_start*.log
+prisma_gen.log

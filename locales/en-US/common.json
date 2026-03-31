@@ -1,0 +1,143 @@
+{
+  "navigation": {
+    "home": "Home",
+    "about": "About",
+    "services": "Services",
+    "patients": "Patients",
+    "professionals": "Professionals",
+    "clinics": "Clinics",
+    "pricing": "Pricing",
+    "contact": "Contact",
+    "blog": "Blog",
+    "careers": "Careers",
+    "login": "Login",
+    "signup": "Sign Up"
+  },
+  "hero": {
+    "title": "Revolutionize Your Healthcare Experience",
+    "subtitle": "The complete platform connecting patients and professionals through the most advanced telemedicine technology",
+    "cta": "Get Started Now",
+    "ctaSecondary": "View Plans"
+  },
+  "features": {
+    "telemedicine": {
+      "title": "Advanced Telemedicine",
+      "description": "Video consultations with specialists from all over Brazil"
+    },
+    "scheduling": {
+      "title": "Smart Scheduling",
+      "description": "Book appointments 24/7 with automatic confirmation"
+    },
+    "records": {
+      "title": "Digital Medical Records",
+      "description": "Your secure medical history accessible anytime, anywhere"
+    },
+    "prescriptions": {
+      "title": "Digital Prescriptions",
+      "description": "Electronic prescriptions valid throughout the country"
+    }
+  },
+  "testimonials": {
+    "title": "What Our Patients Say",
+    "subtitle": "Thousands of lives transformed by Docton technology"
+  },
+  "pricing": {
+    "title": "Plans for Every Need",
+    "subtitle": "Choose the perfect plan for you or your clinic",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "save": "Save 20%",
+    "popular": "Most Popular",
+    "start": "Get Started",
+    "contact": "Contact Sales"
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "subtitle": "We're here to help you",
+    "form": {
+      "name": "Full Name",
+      "email": "Email",
+      "phone": "Phone",
+      "subject": "Subject",
+      "message": "Message",
+      "send": "Send Message"
+    },
+    "departments": {
+      "support": "Support",
+      "sales": "Sales",
+      "partnerships": "Partnerships",
+      "press": "Press"
+    }
+  },
+  "footer": {
+    "description": "Transforming healthcare through technology and innovation",
+    "quickLinks": "Quick Links",
+    "services": "Services",
+    "company": "Company",
+    "legal": "Legal",
+    "social": "Social Media",
+    "copyright": "© 2024 Docton Health. All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "cookies": "Cookie Policy"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success!",
+    "retry": "Try Again",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "download": "Download",
+    "share": "Share",
+    "copy": "Copy",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "next": "Next",
+    "previous": "Previous",
+    "page": "Page",
+    "of": "of",
+    "results": "results",
+    "noResults": "No results found",
+    "required": "Required field",
+    "optional": "Optional",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "accessibility": {
+    "skipToContent": "Skip to main content",
+    "skipToNavigation": "Skip to navigation",
+    "skipToFooter": "Skip to footer",
+    "menuOpen": "Open menu",
+    "menuClose": "Close menu",
+    "searchOpen": "Open search",
+    "searchClose": "Close search",
+    "language": "Language",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
+  },
+  "seo": {
+    "defaultTitle": "Docton Health - Revolutionize Your Healthcare Experience",
+    "defaultDescription": "The complete platform connecting patients and professionals through the most advanced telemedicine technology. Online scheduling, video consultations and digital medical records.",
+    "keywords": "telemedicine, online medical consultation, medical scheduling, digital medical records, medical platform"
+  },
+  "errors": {
+    "404": {
+      "title": "Page Not Found",
+      "description": "Sorry, the page you're looking for doesn't exist or has been moved.",
+      "action": "Go back to homepage"
+    },
+    "500": {
+      "title": "Internal Server Error",
+      "description": "An unexpected error occurred. Our team has been notified.",
+      "action": "Try again"
+    }
+  }
+}

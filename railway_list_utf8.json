@@ -1,0 +1,82 @@
+﻿[
+  {
+    "workspace": {
+      "id": "7c3afbeb-1b05-443d-8b75-f5e770ee1b3e",
+      "name": "Docton Sa├║de's Projects"
+    },
+    "id": "b99ecda3-8b83-47f6-bf5a-258440d6ef79",
+    "name": "Docton Sa├║de",
+    "createdAt": "2026-03-16T12:55:01.720Z",
+    "updatedAt": "2026-03-26T14:07:42.811Z",
+    "deletedAt": null,
+    "environments": {
+      "edges": [
+        {
+          "node": {
+            "id": "33f05134-1325-4021-b7ad-d9bfc22e92c4",
+            "name": "production",
+            "canAccess": true,
+            "serviceInstances": {
+              "edges": [
+                {
+                  "node": {
+                    "serviceId": "51b59dce-0d14-40d0-8470-408024acb80a"
+                  }
+                },
+                {
+                  "node": {
+                    "serviceId": "8d738b98-cd86-40fe-aaec-f47119b330f2"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "services": {
+      "edges": [
+        {
+          "node": {
+            "id": "51b59dce-0d14-40d0-8470-408024acb80a",
+            "name": "docton-backend-2026"
+          }
+        },
+        {
+          "node": {
+            "id": "8d738b98-cd86-40fe-aaec-f47119b330f2",
+            "name": "docton-redis"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "workspace": {
+      "id": "7c3afbeb-1b05-443d-8b75-f5e770ee1b3e",
+      "name": "Docton Sa├║de's Projects"
+    },
+    "id": "4e939462-76e8-4313-b893-4fa71d69dc21",
+    "name": "docton-backend",
+    "createdAt": "2026-03-07T18:28:48.399Z",
+    "updatedAt": "2026-03-18T01:26:31.003Z",
+    "deletedAt": null,
+    "environments": {
+      "edges": [
+        {
+          "node": {
+            "id": "48e66647-2247-4f61-8cc9-79999a6ac6ba",
+            "name": "production",
+            "canAccess": true,
+            "serviceInstances": {
+              "edges": []
+            }
+          }
+        }
+      ]
+    },
+    "services": {
+      "edges": []
+    }
+  }
+]

@@ -1,16 +1,17 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { chronobiologyService } from '../services/chronobiology.service';
+import { chronobiologyService } from '../services/chronobiology.service.js';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
-import prisma from '../lib/prisma';
-import inAppNotificationService from '../services/inAppNotification.service';
-import { PatientReportService } from '../services/patient-report.service';
-import { LoyaltyService } from '../services/loyalty.service';
-import { storageService } from '../services/storage.service';
+import { authenticate, authorize } from '../middleware/auth.js';
+import prisma from '../lib/prisma.js';
+import inAppNotificationService from '../services/inAppNotification.service.js';
+import { PatientReportService } from '../services/patient-report.service.js';
+import { LoyaltyService } from '../services/loyalty.service.js';
+import { storageService } from '../services/storage.service.js';
 import multer from 'multer';
-import { MedicalHistorySchema, AnamnesisSchema, HealthExamSchema, PrescriptionSchema, MedicationReminderSchema, SubscriptionSchema, ChangePlanSchema } from '../schemas/patient.schema';
-import { aiInsightService } from '../services/aiInsight.service';
+import { MedicalHistorySchema, AnamnesisSchema, HealthExamSchema, PrescriptionSchema, MedicationReminderSchema, SubscriptionSchema, ChangePlanSchema } from '../schemas/patient.schema.js';
+import { aiInsightService } from '../services/aiInsight.service.js';
 import { patientService } from '../services/patient.service.js';
+import { AIRecommendationService } from '../services/aiRecommendation.service.js'; // NOVO: Motor de IA Preditiva
 
 const router = Router();
 const upload = multer({
@@ -70,6 +71,25 @@ const validate = (schema: z.ZodSchema) => (req: Request, res: Response, next: Ne
     return res.status(400).json({ error: 'Erro de validação', details: error.errors });
   }
 };
+
+// Rota para logs de analytics do paciente
+router.post('/analytics', authenticate, authorize('PATIENT'), async (req, res) => {
+  try {
+    const { event, properties } = req.body;
+    await prisma.analyticsEvent.create({
+      data: {
+        event,
+        propertiesJson: properties,
+        userId: req.user?.userId,
+        timestamp: new Date()
+      }
+    });
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('[Analytics Error]', error);
+    res.status(500).json({ error: 'Erro ao registrar evento' });
+  }
+});
 
 // Rotas de Suporte para Pacientes
 
@@ -682,6 +702,21 @@ router.get('/daily-tasks', authenticate, authorize('PATIENT'), async (req, res) 
   }
 });
 
+// Listar dicas de saúde (Health Tips)
+router.get('/health-tips', authenticate, authorize('PATIENT'), async (req, res) => {
+  try {
+    const tips = await prisma.healthTip.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+    res.json(tips);
+  } catch (error) {
+    console.error('Erro ao buscar dicas de saúde:', error);
+    res.status(500).json({ error: 'Erro ao buscar dicas de saúde' });
+  }
+});
+
 // Marcar tarefa como concluída e ganhar pontos
 router.patch('/daily-tasks/:id/complete', authenticate, authorize('PATIENT'), async (req, res) => {
   try {
@@ -1065,7 +1100,7 @@ router.put('/settings', authenticate, authorize('PATIENT'), async (req, res) => 
 });
 
 // Finalizar Onboarding com "IA" Preditiva
-router.post('/onboarding', authenticate, authorize('PATIENT'), async (req, res) => {
+router.post('/onboarding', authenticate, authorize('PATIENT'), async (req, res, next) => {
   try {
     const {
       bloodType,
@@ -1075,8 +1110,12 @@ router.post('/onboarding', authenticate, authorize('PATIENT'), async (req, res) 
       lifestyle,
       healthGoals,
       weight,
-      height
+      height,
+      userIntent,   // NOVO: ECONOMIA / RAPIDEZ / ETC
+      userPriority  // NOVO: PREÇO / TEMPO / ETC
     } = req.body;
+
+    console.log('[ONBOARDING DEBUG] Recebido para processamento:', JSON.stringify(req.body));
 
     const patient = await prisma.patient.findUnique({ where: { userId: req.user?.userId } });
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
@@ -1125,57 +1164,58 @@ router.post('/onboarding', authenticate, authorize('PATIENT'), async (req, res) 
       ]);
     }
 
-    // Atualizar paciente - campos seguros (sem allergies/allergiesArray para evitar conflito de versão do Prisma Client)
-    const updatedPatient = await prisma.patient.update({
+    // Atualizar paciente - campos principais do onboarding (agora com alergias inclusas)
+    const updatedPatient = await (prisma.patient as any).update({
       where: { id: patient.id },
       data: {
         bloodType,
+        allergies: Array.isArray(allergies) ? allergies : (allergies ? [String(allergies)] : []),
         chronicDiseases: Array.isArray(chronicDiseases) ? chronicDiseases : [], 
         currentMedications: Array.isArray(currentMedications) ? currentMedications : [],
         lifestyle: lifestyle || {},
         healthGoals: Array.isArray(healthGoals) ? healthGoals : [],
+        userIntent: userIntent || null,
+        userPriority: userPriority || null,
         archetype,
         onboardingCompleted: true,
-        healthPoints: { increment: 500 },
-        experiencePoints: { increment: 1000 },
         level: 2,
         levelTitle: 'Iniciado em Saúde',
         updatedAt: new Date()
       }
     });
 
-    // Salvar alergias via SQL raw para evitar conflito de tipos no Prisma Client
-    if (allergiesValue) {
-      try {
-        await prisma.$executeRaw`
-          UPDATE "Patient" 
-          SET "allergies" = ${allergiesValue}
-          WHERE "id" = ${patient.id}
-        `;
-        console.log(`[ONBOARDING] Alergias salvas via SQL raw: "${allergiesValue}"`);
-      } catch (allergiesErr) {
-        // Não bloqueia o onboarding se falhar apenas o campo de alergias
-        console.warn('[ONBOARDING] Aviso: não foi possível salvar alergias:', allergiesErr);
-      }
+    // Registrar bônus de boas-vindas (isolado para não travar o onboarding se a transação do pooler falhar)
+    try {
+      await LoyaltyService.awardPoints(
+        patient.id,
+        500,
+        'onboarding_complete',
+        'Bônus de Boas-vindas Docton'
+      );
+    } catch (loyaltyErr: any) {
+      console.error('[ONBOARDING] Aviso: falha ao atribuir pontos de bônus:', loyaltyErr.message);
     }
 
-    // Registrar bônus no histórico usando LoyaltyService
-    await LoyaltyService.awardPoints(
-      patient.id,
-      500,
-      'onboarding_complete',
-      'Bônus de Boas-vindas Docton'
-    );
+    // Inicializar motor de IA baseado na intenção (NIVEL 1)
+    try {
+      if (userIntent) {
+        await AIRecommendationService.updatePurchaseStats(
+          req.user!.userId, 
+          `Perfil: ${userIntent}` // Mark inicial de intenção
+        );
+      }
+    } catch (aiErr: any) {
+      console.error('[ONBOARDING] IA Warning: falha ao inicializar perfil preditivo:', aiErr.message);
+    }
 
-    res.json({
+    return res.status(200).json({
       message: 'Onboarding concluído!',
       archetype,
       bonus: { points: 500, xp: 1000 },
       patient: updatedPatient
     });
-  } catch (error) {
-    console.error('Erro no onboarding:', error);
-    res.status(500).json({ error: 'Erro ao processar onboarding' });
+  } catch (error: any) {
+    next(error);
   }
 });
 
@@ -1538,6 +1578,14 @@ router.post('/prescriptions', authenticate, authorize('PATIENT'), validate(Presc
         date: req.body.date ? new Date(req.body.date) : new Date()
       }
     });
+
+    // ANALISE DE IA PREDITIVA (RECOMPRA)
+    try {
+      await AIRecommendationService.analyzePrescription(patient.id, newRecord.id);
+    } catch (aiErr: any) {
+      console.error('[PRESCRIPTION IA] Warning: falha ao processar predição:', aiErr.message);
+    }
+
     res.status(201).json(newRecord);
   } catch (error) {
     console.error('Erro ao salvar prescrição:', error);
@@ -1652,6 +1700,70 @@ router.delete('/medication-reminders/:id', authenticate, authorize('PATIENT'), a
   } catch (error) {
     console.error('Erro ao excluir lembrete:', error);
     res.status(500).json({ error: 'Erro ao excluir lembrete' });
+  }
+});
+
+// Logs de Medicação (Gamificação / Adesão)
+router.get('/medication-logs', authenticate, authorize('PATIENT'), async (req, res) => {
+  try {
+    const patient = await prisma.patient.findUnique({ where: { userId: req.user?.userId } });
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
+
+    const logs = await prisma.medicationLog.findMany({
+      where: { patientId: patient.id },
+      orderBy: { scheduledTime: 'desc' }
+    });
+    res.json(logs);
+  } catch (error) {
+    console.error('Erro ao buscar logs de medicação:', error);
+    res.status(500).json({ error: 'Erro ao buscar logs de medicação' });
+  }
+});
+
+router.post('/medication-logs', authenticate, authorize('PATIENT'), async (req, res) => {
+  try {
+    const patient = await prisma.patient.findUnique({ where: { userId: req.user?.userId } });
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
+
+    const { medicationName, dosage, scheduledTime, status, notes } = req.body;
+    
+    // Check if log already exists for this exact medication and scheduled time
+    const existingLog = await prisma.medicationLog.findFirst({
+      where: {
+        patientId: patient.id,
+        medicationName,
+        scheduledTime: new Date(scheduledTime)
+      }
+    });
+
+    let result;
+    if (existingLog) {
+      result = await prisma.medicationLog.update({
+        where: { id: existingLog.id },
+        data: {
+          status,
+          takenTime: status === 'taken' ? new Date() : null,
+          notes
+        }
+      });
+    } else {
+      result = await prisma.medicationLog.create({
+        data: {
+          patientId: patient.id,
+          medicationName,
+          dosage: dosage || '',
+          scheduledTime: new Date(scheduledTime),
+          status,
+          takenTime: status === 'taken' ? new Date() : null,
+          notes
+        }
+      });
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Erro ao salvar log de medicação:', error);
+    res.status(500).json({ error: 'Erro ao salvar log de medicação' });
   }
 });
 
