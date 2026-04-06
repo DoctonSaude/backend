@@ -11,8 +11,12 @@ import { ChatbotService } from '../services/chatbot.service.js';
 import inAppNotificationService from '../services/inAppNotification.service.js';
 import { wearablesPilotService, addPoints, updateStreak } from '../services/gamification.service.js';
 import { storageService } from '../services/storage.service.js';
+import { SocketService } from '../lib/socket.js';
 import { supabase } from '../lib/supabase.js';
 import { validationCodeService } from '../services/validationCode.service.js';
+import { financeService } from '../services/finance.service.js';
+import { reputationService } from '../services/reputation.service.js';
+import { RevenueService } from '../services/revenue.service.js';
 
 const router = Router();
 const upload = multer({
@@ -73,6 +77,8 @@ const mapPartnerData = (p: any) => {
     isApproved: p.isApproved,
     rating: p.rating || 0,
     totalReviews: p.totalReviews || 0,
+    planTier: p.planTier || 'FREE',
+    planStatus: p.planStatus || 'ACTIVE',
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };
@@ -385,6 +391,8 @@ router.get('/profile', authenticate, authorize('PARTNER'), (req, res) => {
         isApproved: partner.isApproved,
         rating: partner.rating || 0,
         totalReviews: partner.totalReviews || 0,
+        planTier: partner.planTier || 'FREE',
+        planStatus: partner.planStatus || 'ACTIVE',
         createdAt: partner.createdAt,
         updatedAt: partner.updatedAt,
       });
@@ -483,6 +491,38 @@ router.put('/settings', authenticate, authorize('PARTNER'), async (req, res) => 
   } catch (error) {
     console.error('Erro ao atualizar configurações:', error);
     res.status(500).json({ error: 'Erro ao atualizar configurações' });
+  }
+});
+
+// Update Partner Plan
+router.put('/plan', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { planTier } = req.body;
+    const userId = req.user?.userId;
+
+    if (!['FREE', 'PRO', 'PREMIUM'].includes(planTier)) {
+      return res.status(400).json({ error: 'Plano inválido' });
+    }
+
+    const partner = await prisma.partner.findUnique({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const updated = await prisma.partner.update({
+      where: { id: partner.id },
+      data: { 
+        planTier,
+        planStatus: 'ACTIVE' // Simplified for now
+      }
+    });
+
+    res.json({
+      success: true,
+      planTier: updated.planTier,
+      planStatus: updated.planStatus
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar plano:', error);
+    res.status(500).json({ error: 'Erro ao atualizar plano' });
   }
 });
 
@@ -707,6 +747,18 @@ router.put('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
       }
     });
 
+    // Finance Integration (Phase 4): Se estiver mudando para COMPLETED (concluída), processar repasse
+    if (status === 'COMPLETED' && appointment.status === 'COMPLETED') { // Só chamar se a mudança for confirmada no BD
+      try {
+        await financeService.processAppointmentCompletion(appointment.id);
+        console.log(`[Finance] Repasse processado para consulta (via PUT): ${appointment.id}`);
+      } catch (finErr) {
+        console.error('Erro ao processar financeiro na conclusão (PUT):', finErr);
+      }
+    }
+
+    SocketService.sendToUser(appointment.patientId, 'timelineUpdate', { type: 'appointment', id: appointment.id, status: appointment.status });
+
     return res.json(appointment);
   } catch (error) {
     console.error('Erro ao atualizar agendamento:', error);
@@ -766,6 +818,9 @@ router.put('/medical-records/:id', authenticate, authorize('PARTNER'), async (re
       }
     });
 
+    SocketService.sendToUser(record.patientId, 'medicalHistoryUpdate', updated);
+    SocketService.sendToUser(record.patientId, 'timelineUpdate', { type: 'medicalRecord', id: updated.id });
+
     return res.json(updated);
   } catch (error) {
     console.error('Erro ao atualizar prontuário:', error);
@@ -808,6 +863,9 @@ router.post('/medical-records/:id/attachments', authenticate, authorize('PARTNER
         attachments: JSON.stringify([...(existingAttachments as any[]), ...urls])
       } as any
     });
+
+    SocketService.sendToUser(record.patientId, 'medicalHistoryUpdate', updated);
+    SocketService.sendToUser(record.patientId, 'timelineUpdate', { type: 'attachment', id: updated.id });
 
     return res.json(updated);
   } catch (error) {
@@ -920,6 +978,18 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
         data: { status: 'COMPLETED' }
       });
 
+      // Finance Integration (Phase 4): Processar repasse e alimentar carteira do parceiro
+      try {
+        await financeService.processAppointmentCompletion(appointment.id);
+        console.log(`[Finance] Repasse automático processado para consulta (via Validação): ${appointment.id}`);
+      } catch (finErr) {
+        console.error('Erro ao processar financeiro na conclusão via token:', finErr);
+      }
+ 
+      // Notificar o paciente (Real-time update)
+      SocketService.sendToUser(appointment.patient.userId, 'timelineUpdate', { type: 'appointment', id: appointment.id, status: 'COMPLETED' });
+      SocketService.sendToUser(appointment.patient.userId, 'healthLogsUpdate', { type: 'appointment_completed' });
+
       // Notificar o paciente
       try {
         await inAppNotificationService.createNotification({
@@ -958,6 +1028,9 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
 
         // Atualizar sequência (streak) do paciente
         await updateStreak(appointment.patient.id);
+
+        // GATILHO DE DESAFIO (Conectividade Gamification)
+        await wearablesPilotService.triggerChallengeAction(appointment.patient.userId, 'appointment_done');
       } catch (gamifyErr) {
         console.error('Erro ao processar gamificação no checkout:', gamifyErr);
       }
@@ -1199,6 +1272,9 @@ router.put('/availability/:id', authenticate, authorize('PARTNER'), async (req, 
         priority: 'medium',
         link: '/patient/agendamentos?tab=requests'
       });
+
+      // Emitir via Socket para atualização em tempo real no frontend
+      SocketService.sendToUser(request.patient.user.id, 'availabilityUpdate', updatedRequest);
     }
 
     res.json(updatedRequest);
@@ -1212,7 +1288,7 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
     const userId = (req as any).user.userId || (req as any).user.id;
     const partner = await prisma.partner.findFirst({
       where: { userId },
-      select: { id: true, rating: true, totalReviews: true, createdAt: true }
+      select: { id: true, rating: true, totalReviews: true, planTier: true, planStatus: true, createdAt: true }
     });
 
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
@@ -1361,7 +1437,9 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
         monthlyRevenue,
         revenueGrowth,
         apptsGrowth,
-        newAppointments: thisMonthAppts
+        newAppointments: thisMonthAppts,
+        planTier: partner.planTier || 'FREE',
+        planStatus: partner.planStatus || 'ACTIVE'
       },
       recentAppointments: recentAppointments.map(a => ({
         id: a.id,
@@ -2507,6 +2585,336 @@ router.get('/validation-codes/stats', authenticate, authorize('PARTNER'), async 
   } catch (error) {
     console.error('Erro ao buscar estatísticas de validação:', error);
     res.status(500).json({ error: 'Erro ao buscar estatísticas de validação' });
+  }
+});
+
+// ==============================================================================
+// GESTÃO DE ATIVOS (SALAS E EQUIPAMENTOS)
+// ==============================================================================
+
+router.get('/rooms', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const rooms = await prisma.room.findMany({
+      where: { partnerId: partner.id },
+      include: { _count: { select: { appointments: true } } }
+    });
+    res.json({ data: rooms });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar salas' });
+  }
+});
+
+router.post('/rooms', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const room = await prisma.room.create({
+      data: {
+        ...req.body,
+        partnerId: partner.id
+      }
+    });
+    res.json(room);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar sala' });
+  }
+});
+
+router.delete('/rooms/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+
+    await prisma.room.deleteMany({
+      where: { id, partnerId: partner?.id }
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir sala' });
+  }
+});
+
+router.get('/equipment', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const equipments = await prisma.equipment.findMany({
+      where: { partnerId: partner.id }
+    });
+    res.json({ data: equipments });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar equipamentos' });
+  }
+});
+
+router.post('/equipment', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const equipment = await prisma.equipment.create({
+      data: {
+        ...req.body,
+        partnerId: partner.id
+      }
+    });
+    res.json(equipment);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar equipamento' });
+  }
+});
+
+router.delete('/equipment/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+
+    await prisma.equipment.deleteMany({
+      where: { id, partnerId: partner?.id }
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir equipamento' });
+  }
+});
+
+// ==================== COMBOS E INTELIGÊNCIA DE RECEITA ====================
+
+router.get('/combos', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const partner = await prisma.partner.findFirst({
+      where: { userId },
+      select: { id: true }
+    });
+
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const combos = await prisma.serviceCombo.findMany({
+      where: { partnerId: partner.id },
+      include: { services: true }
+    });
+
+    res.json({ data: combos });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao listar combos' });
+  }
+});
+
+router.post('/combos', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const { name, description, price, serviceIds } = req.body;
+
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const combo = await prisma.serviceCombo.create({
+      data: {
+        name,
+        description,
+        price: parseFloat(price),
+        partnerId: partner.id,
+        services: {
+          connect: serviceIds.map((id: string) => ({ id }))
+        }
+      },
+      include: { services: true }
+    });
+
+    res.status(201).json(combo);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao criar combo' });
+  }
+});
+
+router.delete('/combos/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+
+    await prisma.serviceCombo.deleteMany({
+      where: { id, partnerId: partner?.id }
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir combo' });
+  }
+});
+
+router.get('/revenue/insights', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = (req as any).user?.userId || (req as any).user?.id;
+    console.log(`[Partners/Insights] Buscando insights para o usuário: ${userId}`);
+    
+    // Busca robusta pelo parceiro
+    const partner = await prisma.partner.findFirst({ 
+      where: { 
+        OR: [
+          { userId: userId },
+          { id: userId } // Caso o ID do usuário seja o mesmo do parceiro em alguns contextos
+        ]
+      } 
+    });
+    
+    if (!partner) {
+      console.warn(`[Partners/Insights] 404: Parceiro não encontrado na tabela 'Partner' para userId: ${userId}.`);
+      return res.status(404).json({ 
+        error: 'Parceiro não encontrado', 
+        details: 'Perfil de parceiro não localizado no banco de dados. Verifique se o cadastro foi concluído.' 
+      });
+    }
+
+    console.log(`[Partners/Insights] Parceiro localizado: ${partner.id}. Gerando insights...`);
+    const insights = await RevenueService.getInsights(partner.id);
+
+    return res.json(insights);
+  } catch (error: any) {
+    console.error(`[Partners/Insights] Erro ao gerar insights:`, error?.message || error);
+    return res.status(500).json({ error: 'Erro interno ao gerar insights' });
+  }
+});
+
+router.put('/revenue/happy-hour', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const { happyHourConfig } = req.body;
+
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const updated = await prisma.partner.update({
+      where: { id: partner.id },
+      data: { happyHourConfig }
+    });
+
+    res.json(updated.happyHourConfig);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao salvar configuração' });
+  }
+});
+
+router.get('/patients', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const partner = await prisma.partner.findFirst({
+      where: { userId },
+      select: { id: true }
+    });
+
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    // Buscar pacientes únicos que já agendaram com este parceiro
+    const appointments = await prisma.appointment.findMany({
+      where: { partnerId: partner.id },
+      include: {
+        patient: {
+          include: {
+            user: { select: { name: true, email: true, phone: true, avatar: true } }
+          }
+        }
+      },
+      orderBy: { dateTime: 'desc' }
+    });
+
+    // Agrupar por paciente e calcular métricas
+    const patientMap = new Map();
+    appointments.forEach(app => {
+      if (!app.patient) return;
+      if (!patientMap.has(app.patientId)) {
+        patientMap.set(app.patientId, {
+          id: app.patientId,
+          name: app.patient.user.name,
+          email: app.patient.user.email,
+          phone: app.patient.user?.phone || '',
+          lastVisit: app.dateTime,
+          totalVisits: 1,
+          status: 'active'
+        });
+      } else {
+        const p = patientMap.get(app.patientId);
+        p.totalVisits += 1;
+      }
+    });
+
+    res.json(Array.from(patientMap.values()));
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao listar pacientes' });
+  }
+});
+
+
+/**
+ * FINANCE ENDPOINTS
+ */
+
+// Busca estatísticas financeiras e carteira
+router.get('/finance/stats', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const stats = await financeService.getWalletStats(req.user.partnerId);
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Solicita saque
+router.post('/finance/payout', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const { amount, bankDetails } = req.body;
+    const request = await financeService.requestPayout(req.user.partnerId, amount, bankDetails);
+    res.json(request);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * REPUTATION ENDPOINTS
+ */
+
+// Busca estatísticas de NPS e reputação
+router.get('/reputation/stats', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const stats = await reputationService.getReputationStats(req.user.partnerId);
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Busca todas as avaliações
+router.get('/reputation/reviews', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const reviews = await reputationService.getPartnerReviews(req.user.partnerId);
+    res.json(reviews);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Responde a uma avaliação
+router.post('/reputation/reviews/:reviewId/reply', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const { reply } = req.body;
+    const { reviewId } = req.params;
+    const updatedReview = await reputationService.replyToReview(reviewId, req.user.partnerId, reply);
+    res.json(updatedReview);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 });
 
