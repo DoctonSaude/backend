@@ -2951,21 +2951,20 @@ router.get('/prescriptions', authenticate, authorize('PARTNER', 'PHARMACY'), asy
         if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
         partnerId = partner.id;
     } else {
-        // Se for Farmácia, por enquanto simulamos buscando as prescrições mais recentes do sistema
-        // No futuro, filtraríamos por prescrições enviadas para esta farmácia específica
-        const pharmacy = await prisma.pharmacy.findUnique({
-            where: { userId }
+        // PHARMACY Role: O modelo Pharmacy se vincula via pharmacyId no User
+        const userWithPharm = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { pharmacy: true }
         });
-        if (!pharmacy) return res.status(404).json({ error: 'Farmácia não encontrada' });
+        
+        if (!userWithPharm?.pharmacy) return res.status(404).json({ error: 'Farmácia não encontrada para este usuário' });
         
         // Retorna todas as prescrições (Mock de Histórico Geral para Farmácia)
-        const prescriptions = await prescriptionService.getPrescriptionsByPartner(''); // Vazio busca geral ou mock
+        const prescriptions = await prescriptionService.getPrescriptionsByPartner('');
         return res.json(prescriptions);
     }
 
     const prescriptions = await prescriptionService.getPrescriptionsByPartner(partnerId);
-
-    const prescriptions = await prescriptionService.getPrescriptionsByPartner(partner.id);
     res.json(prescriptions);
   } catch (err) {
     console.error('[Prescriptions] Error fetching:', err);
