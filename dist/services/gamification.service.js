@@ -452,6 +452,33 @@ class WearablesPilotService {
         });
         // Simular dados reais (mock for pilot)
         const steps = 5000 + Math.floor(Math.random() * 5000);
+        // PERSISTÊNCIA NO PRONTUÁRIO (Conectividade com outros módulos)
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const existingLog = await prisma_1.default.healthLog.findFirst({
+            where: {
+                patientId: patient.id,
+                type: 'STEPS',
+                logDate: { gte: todayStart }
+            }
+        });
+        if (existingLog) {
+            await prisma_1.default.healthLog.update({
+                where: { id: existingLog.id },
+                data: { value: steps.toString(), logDate: new Date() }
+            });
+        }
+        else {
+            await prisma_1.default.healthLog.create({
+                data: {
+                    patientId: patient.id,
+                    type: 'STEPS',
+                    value: steps.toString(),
+                    unit: 'Passos',
+                    logDate: new Date()
+                }
+            });
+        }
         return [{
                 userId,
                 steps,
@@ -460,9 +487,9 @@ class WearablesPilotService {
                 source: connection.platform === 'apple_health' ? 'apple_health' : 'google_fit'
             }];
     }
-    async checkAndCompleteStepChallenges(userId, stepsToday) {
+    async triggerChallengeAction(userId, actionType, value = 1) {
         try {
-            const patient = await prisma_1.default.patient.findUnique({
+            const patient = await prisma_1.default.patient.findFirst({
                 where: { userId },
                 include: {
                     patientChallenges: {
@@ -472,32 +499,56 @@ class WearablesPilotService {
                 }
             });
             if (!patient)
-                return { challengesCompleted: [], pointsEarned: 0, notifications: [] };
-            const challengesCompleted = [];
-            let totalPointsEarned = 0;
-            const notifications = [];
-            // Filtrar desafios do tipo 'steps' que o paciente está participando
-            const stepChallenges = patient.patientChallenges.filter(pc => pc.challenge.type.toLowerCase().includes('steps') ||
-                pc.challenge.type.toLowerCase().includes('passos'));
+                return null;
+            const results = {
+                challengesCompleted: [],
+                pointsEarned: 0,
+                notifications: []
+            };
             const now = new Date();
-            for (const pc of stepChallenges) {
-                const target = pc.challenge.targetValue || 0;
-                // Atualizar progresso se os passos de hoje forem maiores que o progresso atual
-                if (stepsToday > pc.progress) {
-                    const newProgress = Math.min(stepsToday, target);
+            for (const pc of patient.patientChallenges) {
+                const challenge = pc.challenge;
+                let shouldUpdate = false;
+                let newProgress = pc.progress;
+                // Lógica de correspondência por tipo de desafio
+                const type = challenge.type.toLowerCase();
+                const action = actionType.toLowerCase();
+                if (type.includes('steps') && action === 'steps') {
+                    shouldUpdate = true;
+                    newProgress = Math.max(pc.progress, value);
+                }
+                else if (type.includes('water') && action === 'water') {
+                    shouldUpdate = true;
+                    newProgress = pc.progress + value;
+                }
+                else if (type.includes('weight') && action === 'weight') {
+                    shouldUpdate = true;
+                    newProgress = pc.progress + 1; // Incrementa contagem de logs
+                }
+                else if (type.includes('appointment') && action === 'appointment_done') {
+                    shouldUpdate = true;
+                    newProgress = pc.progress + 1;
+                }
+                else if (type.includes('exam') && action === 'exam_added') {
+                    shouldUpdate = true;
+                    newProgress = pc.progress + 1;
+                }
+                if (shouldUpdate) {
+                    const target = challenge.targetValue || 1;
+                    const finalProgress = Math.min(newProgress, target);
                     let updatedStatus = pc.status;
                     let completedAt = pc.completedAt;
-                    if (newProgress >= target) {
+                    if (finalProgress >= target && pc.status !== 'COMPLETED') {
                         updatedStatus = 'COMPLETED';
                         completedAt = now;
-                        challengesCompleted.push(pc.challenge.title);
-                        totalPointsEarned += pc.challenge.points;
-                        notifications.push(`🎉 Parabéns! Você completou o desafio: ${pc.challenge.title}`);
+                        results.challengesCompleted.push(challenge.title);
+                        results.pointsEarned += challenge.points;
+                        results.notifications.push(`🎉 Desafio concluído: ${challenge.title}`);
                     }
                     await prisma_1.default.patientChallenge.update({
                         where: { id: pc.id },
                         data: {
-                            progress: newProgress,
+                            progress: finalProgress,
                             status: updatedStatus,
                             completedAt,
                             updatedAt: now
@@ -505,37 +556,36 @@ class WearablesPilotService {
                     });
                 }
             }
-            // Se ganhou pontos, atualizar o saldo do paciente e gravar no histórico
-            if (totalPointsEarned > 0) {
+            // Atualizar Patient se houver conclusão
+            if (results.pointsEarned > 0) {
                 await prisma_1.default.patient.update({
                     where: { id: patient.id },
                     data: {
-                        healthPoints: { increment: totalPointsEarned },
-                        experiencePoints: { increment: totalPointsEarned * 10 }, // XP é 10x pontos por padrão
-                        totalChallengesCompleted: { increment: challengesCompleted.length }
+                        healthPoints: { increment: results.pointsEarned },
+                        experiencePoints: { increment: results.pointsEarned * 10 },
+                        totalChallengesCompleted: { increment: results.challengesCompleted.length }
                     }
                 });
-                for (const title of challengesCompleted) {
+                for (const title of results.challengesCompleted) {
                     await prisma_1.default.pointsHistory.create({
                         data: {
                             patientId: patient.id,
-                            points: totalPointsEarned / challengesCompleted.length,
+                            points: results.pointsEarned / results.challengesCompleted.length,
                             action: 'challenge_completed_auto',
-                            description: `Conclusão automática via Wearable: ${title}`
+                            description: `Conclusão via ação no sistema: ${title}`
                         }
                     });
                 }
             }
-            return {
-                challengesCompleted,
-                pointsEarned: totalPointsEarned,
-                notifications
-            };
+            return results;
         }
         catch (error) {
-            console.error('Erro ao verificar desafios de wearables:', error);
-            return { challengesCompleted: [], pointsEarned: 0, notifications: [] };
+            console.error('[Gamification] Erro no gatilho universal:', error);
+            return null;
         }
+    }
+    async checkAndCompleteStepChallenges(userId, stepsToday) {
+        return this.triggerChallengeAction(userId, 'steps', stepsToday);
     }
     async generatePilotMetrics() {
         const totalUsers = await prisma_1.default.patient.count();

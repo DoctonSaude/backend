@@ -96,13 +96,24 @@ router.get('/dashboard', ...adminAuth, async (req, res) => {
       dateFilter = { gte: d };
     }
 
-    const [totalUsers, totalPatients, totalPartners, totalAdmins, totalAppointments, completedAppointments] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { role: 'PATIENT' } }),
-      prisma.user.count({ where: { role: 'PARTNER' } }),
-      prisma.user.count({ where: { role: 'ADMIN' } }),
+    // Otimização: Agrupar contagens de usuários por papel em uma única consulta
+    const userStats = await prisma.user.groupBy({
+      by: ['role'],
+      _count: { _all: true }
+    });
+
+    const getCountByRole = (role: string) => userStats.find(s => s.role === role)?._count._all || 0;
+
+    const totalUsers = userStats.reduce((acc, curr) => acc + curr._count._all, 0);
+    const totalPatients = getCountByRole('PATIENT');
+    const totalPartners = getCountByRole('PARTNER');
+    const totalAdmins = getCountByRole('ADMIN');
+    
+    // Consultas paralelas para agendamentos e farmácias
+    const [totalAppointments, completedAppointments, totalPharmacies] = await Promise.all([
       prisma.appointment.count(),
-      prisma.appointment.count({ where: { status: 'COMPLETED' } })
+      prisma.appointment.count({ where: { status: 'COMPLETED' } }),
+      prisma.pharmacy.count()
     ]);
 
     // --- Growth Calculation ---
@@ -117,7 +128,8 @@ router.get('/dashboard', ...adminAuth, async (req, res) => {
       currUsers, prevUsers,
       currPatients, prevPatients,
       currPartners, prevPartners,
-      currAppts, prevAppts
+      currAppts, prevAppts,
+      currPharmacies, prevPharmacies
     ] = await Promise.all([
       prisma.user.count({ where: { createdAt: { gte: startRange, lte: endRange } } }),
       prisma.user.count({ where: { createdAt: { gte: prevStart, lte: prevEnd } } }),
@@ -127,6 +139,8 @@ router.get('/dashboard', ...adminAuth, async (req, res) => {
       prisma.user.count({ where: { role: 'PARTNER', createdAt: { gte: prevStart, lte: prevEnd } } }),
       prisma.appointment.count({ where: { createdAt: { gte: startRange, lte: endRange } } }),
       prisma.appointment.count({ where: { createdAt: { gte: prevStart, lte: prevEnd } } }),
+      prisma.pharmacy.count({ where: { createdAt: { gte: startRange, lte: endRange } } }),
+      prisma.pharmacy.count({ where: { createdAt: { gte: prevStart, lte: prevEnd } } }),
     ]);
 
     const calcGrowth = (curr: number, prev: number) => {
@@ -138,30 +152,67 @@ router.get('/dashboard', ...adminAuth, async (req, res) => {
       users: calcGrowth(currUsers, prevUsers),
       patients: calcGrowth(currPatients, prevPatients),
       partners: calcGrowth(currPartners, prevPartners),
-      appointments: calcGrowth(currAppts, prevAppts)
+      appointments: calcGrowth(currAppts, prevAppts),
+      pharmacies: calcGrowth(currPharmacies, prevPharmacies)
     };
 
     // --- Datasets for Charts ---
 
-    // 1. User Growth Data (Line Chart)
-    const userGrowthRaw = await prisma.user.findMany({
-      where: { createdAt: { gte: startRange, lte: endRange } },
-      select: { createdAt: true, role: true },
-      orderBy: { createdAt: 'asc' }
-    });
+    // 1. User Growth Data (Line Chart) - Refatorado para contar entidades reais
+    const [patientsRaw, partnersRaw, pharmaciesRaw] = await Promise.all([
+      prisma.patient.findMany({
+        where: { createdAt: { gte: startRange, lte: endRange } },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' }
+      }),
+      prisma.partner.findMany({
+        where: { createdAt: { gte: startRange, lte: endRange } },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' }
+      }),
+      prisma.pharmacy.findMany({
+        where: { createdAt: { gte: startRange, lte: endRange } },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' }
+      })
+    ]);
 
-    const userGrowthMap = new Map<string, { period: string, usuarios: number, pacientes: number, parceiros: number }>();
-    userGrowthRaw.forEach(user => {
-      const day = user.createdAt.toISOString().split('T')[0];
+    const userGrowthMap = new Map<string, { period: string, usuarios: number, pacientes: number, parceiros: number, farmacias: number }>();
+    
+    // Processar Pacientes
+    patientsRaw.forEach(p => {
+      const day = p.createdAt.toISOString().split('T')[0];
       if (!userGrowthMap.has(day)) {
-        userGrowthMap.set(day, { period: day, usuarios: 0, pacientes: 0, parceiros: 0 });
+        userGrowthMap.set(day, { period: day, usuarios: 0, pacientes: 0, parceiros: 0, farmacias: 0 });
       }
       const entry = userGrowthMap.get(day)!;
+      entry.pacientes++;
       entry.usuarios++;
-      if (user.role === 'PATIENT') entry.pacientes++;
-      if (user.role === 'PARTNER') entry.parceiros++;
     });
-    const userGrowthData = Array.from(userGrowthMap.values());
+
+    // Processar Parceiros
+    partnersRaw.forEach(p => {
+      const day = p.createdAt.toISOString().split('T')[0];
+      if (!userGrowthMap.has(day)) {
+        userGrowthMap.set(day, { period: day, usuarios: 0, pacientes: 0, parceiros: 0, farmacias: 0 });
+      }
+      const entry = userGrowthMap.get(day)!;
+      entry.parceiros++;
+      entry.usuarios++;
+    });
+
+    // Processar Farmácias
+    pharmaciesRaw.forEach(p => {
+      const day = p.createdAt.toISOString().split('T')[0];
+      if (!userGrowthMap.has(day)) {
+        userGrowthMap.set(day, { period: day, usuarios: 0, pacientes: 0, parceiros: 0, farmacias: 0 });
+      }
+      const entry = userGrowthMap.get(day)!;
+      entry.farmacias++;
+      entry.usuarios++;
+    });
+
+    const userGrowthData = Array.from(userGrowthMap.values()).sort((a, b) => a.period.localeCompare(b.period));
 
     // 2. Sales / Revenue vs Expenses
     const transactions = await prisma.transaction.findMany({
@@ -266,6 +317,7 @@ router.get('/dashboard', ...adminAuth, async (req, res) => {
       totalPartners,
       totalAppointments,
       completedAppointments,
+      totalPharmacies,
       growth,
       userGrowthData,
       appointmentsBySpecialty,
@@ -446,6 +498,119 @@ router.get('/analytics/overview', authenticate, authorize('ADMIN'), async (req, 
   } catch (error) {
     console.error('Erro em /admin/analytics/overview:', error);
     res.status(200).json({ totalRevenue: 0, customerSatisfaction: 0 });
+  }
+});
+
+// ==========================================
+// Módulo Admin Financeiro Global (Fase 5)
+// ==========================================
+
+router.get('/finance/overview', ...adminAuth, async (req, res) => {
+  try {
+    // Rendimento da plataforma (soma de doctonFee retidos)
+    const totalFees = await prisma.appointment.aggregate({
+      where: { doctonFee: { gt: 0 }, status: 'COMPLETED' },
+      _sum: { doctonFee: true }
+    });
+
+    const pendingPayoutsDb = await prisma.payoutRequest.findMany({
+      where: { status: 'PENDING' }
+    });
+
+    res.json({
+      platformRevenue: totalFees._sum.doctonFee || 0,
+      activeRequestsCount: pendingPayoutsDb.length,
+      activeRequestsSum: pendingPayoutsDb.reduce((s, p) => s + p.amount, 0)
+    });
+  } catch (error) {
+    console.error('Erro em /admin/finance/overview:', error);
+    res.status(500).json({ error: 'Erro ao buscar overview financeiro' });
+  }
+});
+
+router.get('/finance/payouts', ...adminAuth, async (req, res) => {
+  try {
+    // Buscar solicitações de saque PENDING com dados do parceiro
+    const payouts = await prisma.payoutRequest.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        partner: {
+          select: { name: true, specialty: true, user: { select: { email: true, phone: true } } }
+        }
+      }
+    });
+    res.json(payouts);
+  } catch (error) {
+    console.error('Erro em /admin/finance/payouts:', error);
+    res.status(500).json({ error: 'Erro ao buscar solicitações de repasse' });
+  }
+});
+
+router.post('/finance/payouts/:id/approve', ...adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const payout = await prisma.payoutRequest.findUnique({ where: { id } });
+    if (!payout || payout.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Solicitação inválida ou já processada' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Marca como processado
+      await tx.payoutRequest.update({
+        where: { id },
+        data: { status: 'PROCESSED', processedAt: new Date() }
+      });
+      // (Opcional - registrar que o TED ocorreu em log de contabilidade avançada)
+    });
+
+    res.json({ success: true, message: 'Repasse aprovado e liquidação registrada.' });
+  } catch (error) {
+    console.error('Erro em /admin/finance/payouts/:id/approve:', error);
+    res.status(500).json({ error: 'Erro processando aprovação de saque' });
+  }
+});
+
+router.post('/finance/payouts/:id/reject', ...adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const payout = await prisma.payoutRequest.findUnique({ where: { id } });
+    if (!payout || payout.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Solicitação inválida ou já processada' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Marca como rejeitado
+      await tx.payoutRequest.update({
+        where: { id },
+        data: { status: 'REJECTED', processedAt: new Date() } // Poderia haver campo reason se extendido no schema
+      });
+
+      // 2. Devolver fundos do saque cancelado
+      await tx.partnerWallet.update({
+        where: { partnerId: payout.partnerId },
+        data: { balance: { increment: payout.amount } }
+      });
+      
+      // 3. Estornar transação (opcional mas recomendado)
+      await tx.partnerTransaction.create({
+        data: {
+          partnerId: payout.partnerId,
+          type: 'CREDIT',
+          amount: payout.amount,
+          description: `Estorno de Saque Recusado: ${reason || 'Sem justificativa'}`,
+          status: 'AVAILABLE'
+        }
+      });
+    });
+
+    res.json({ success: true, message: 'Repasse rejeitado com sucesso.' });
+  } catch (error) {
+    console.error('Erro em /admin/finance/payouts/:id/reject:', error);
+    res.status(500).json({ error: 'Erro processando rejeição de saque' });
   }
 });
 
@@ -696,26 +861,47 @@ router.post('/automated-reports/:id/generate', ...adminAuth, async (req, res) =>
 
 router.get('/users', ...adminAuth, async (req, res) => {
   try {
+    // Otimização: Selecionar apenas campos necessários para a listagem
     const dbUsers = await prisma.user.findMany({
-      include: {
+      select: {
+        id: true, name: true, email: true, role: true, phone: true, avatar: true, createdAt: true, emailVerified: true,
         patient: {
-          include: {
+          select: {
+            cpf: true, birthDate: true, dateOfBirth: true,
             subscriptions: {
-              include: { plan: true },
               where: { status: 'ACTIVE' },
-              take: 1
+              take: 1,
+              select: { plan: { select: { name: true } } }
             }
           }
         },
-        partner: { select: { cnpj: true, specialty: true } }
+        partner: { select: { isApproved: true } },
+        pharmacy: { select: { isApproved: true } }
       },
       orderBy: { createdAt: 'desc' },
+      take: 200 // Limite de segurança para manter a performance alta
     });
 
     const mapped = dbUsers.map(u => {
       let userPlan = 'Gratuito';
       if (u.patient && u.patient.subscriptions && u.patient.subscriptions.length > 0) {
-        userPlan = u.patient.subscriptions[0].plan.name;
+        // Normalização: 'Plano Premium' -> 'Premium', 'Plano Gold' -> 'Gold'
+        // Segurança Extra com optional chaining para evitar erro 500 se o plano sumir
+        const rawName = u.patient.subscriptions[0]?.plan?.name || '';
+        userPlan = rawName.replace(/^Plano\s+/i, '') || 'Gratuito';
+      }
+
+      // Lógica de Status: 
+      // Pacientes e Admins são Ativos por padrão.
+      // Parceiros e Farmácias dependem de aprovação.
+      let currentStatus = 'Ativo';
+      if (u.role === 'PHARMACY' && u.pharmacy) {
+        currentStatus = u.pharmacy.isApproved ? 'Ativo' : 'Pendente';
+      } else if (u.role === 'PARTNER' && u.partner) {
+        currentStatus = u.partner.isApproved ? 'Ativo' : 'Pendente';
+      } else if (!u.emailVerified) {
+        // Se desejar manter a verificação de e-mail como critério para pacientes
+        // currentStatus = 'Pendente';
       }
 
       return {
@@ -726,10 +912,15 @@ router.get('/users', ...adminAuth, async (req, res) => {
         phone: u.phone,
         avatar: u.avatar,
         createdAt: u.createdAt,
-        status: u.emailVerified ? 'Ativo' : 'Pendente',
+        status: currentStatus,
         plan: userPlan,
-        registrationDate: u.createdAt.toLocaleDateString('pt-BR'),
-        details: u.patient || u.partner || {}
+        registrationDate: u.createdAt ? 
+          `${String(u.createdAt.getDate()).padStart(2, '0')}/${String(u.createdAt.getMonth() + 1).padStart(2, '0')}/${u.createdAt.getFullYear()}` 
+          : 'N/A',
+        details: u.patient || u.partner || u.pharmacy || {},
+        // Campos explícitos para o frontend Usuarios.tsx
+        cpf: u.patient?.cpf || '',
+        birthDate: u.patient?.birthDate || u.patient?.dateOfBirth || null
       };
     });
 
@@ -845,14 +1036,27 @@ router.put('/users/:id', ...adminAuth, async (req, res) => {
     if (updated.role === 'PATIENT' && plan) {
       const patient = updated.patient;
       if (patient) {
-        // Mapear nomes amigáveis para keys do DB se necessário
-        const planSearch = plan === 'Gratuito' ? 'basic' : plan.toLowerCase();
+        // Mapear nomes do dashboard para chaves/nomes reais do banco
+        let planSearch = (plan || '').toLowerCase();
+        
+        // Mapa de tradução para garantir que Básico mapeie para basic ou Gratuito
+        const planMap: Record<string, string> = {
+          'gratuito': 'basic',
+          'básico': 'basic',
+          'basico': 'basic',
+          'gold': 'gold',
+          'premium': 'premium',
+          'cortesia': 'cortesia'
+        };
+
+        const targetKey = planMap[planSearch] || planSearch;
 
         const dbPlan = await prisma.plan.findFirst({
           where: {
             OR: [
-              { key: planSearch },
-              { name: { contains: plan, mode: 'insensitive' } }
+              { key: targetKey },
+              { name: { contains: plan, mode: 'insensitive' } },
+              { key: { contains: planSearch, mode: 'insensitive' } }
             ]
           }
         });

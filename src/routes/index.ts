@@ -29,11 +29,18 @@ import categoriesRoutes from './categories.routes.js';
 import ocrRoutes from './ocr.routes.js';
 import quotePaymentsRoutes from './quote-payments.routes.js';
 import healthToolRoutes from './healthTool.routes.js';
+import pharmacyRoutes from './pharmacy.routes.js'; // NOVO: Farmácia Pro 2.0
+import subscriptionRoutes from './subscription.routes.js'; // NOVO: Motor de Recorrência
+import familyRoutes from './family.routes.js'; // NOVO: Gestão Familiar (Onda 2)
+import timelineRoutes from './timeline.routes.js'; // NOVO: Timeline de Saúde (Onda 3)
 // import chatRoutes from './chat.routes.js';
 
 const router = Router();
+console.log('[API] Registrando rotas de Timeline (Prioridade Máxima)...');
 
 // 1. API Core Routes
+router.use('/timeline', timelineRoutes); // Prioridade máxima (Fallback + Onda 3)
+router.use('/patients/timeline', timelineRoutes); // Alias padronizado
 router.use('/auth', authRoutes);
 router.use('/patients', patientRoutes);
 router.use('/partners', partnerRoutes);
@@ -68,6 +75,10 @@ router.use('/telemedicine', telemedicineRoutes);
 router.use('/ocr', ocrRoutes);
 router.use('/quote-payments', quotePaymentsRoutes);
 router.use('/health-tools', healthToolRoutes);
+router.use('/pharmacy', pharmacyRoutes); // NOVO: Farmácia Pro 2.0
+router.use('/subscriptions', subscriptionRoutes); // NOVO: Motor de Recorrência
+router.use('/family', familyRoutes); // NOVO: Gestão Familiar (Onda 2)
+// router.use('/timeline', timelineRoutes); // Movido para o topo
 router.post('/errors', (req, res) => {
     console.error('[FRONTEND ERROR]', req.body);
     res.status(200).json({ success: true });

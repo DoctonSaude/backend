@@ -17,6 +17,7 @@ import { validationCodeService } from '../services/validationCode.service.js';
 import { financeService } from '../services/finance.service.js';
 import { reputationService } from '../services/reputation.service.js';
 import { RevenueService } from '../services/revenue.service.js';
+import { prescriptionService } from '../services/prescription.service.js';
 
 const router = Router();
 const upload = multer({
@@ -1302,27 +1303,28 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
       appointments,
       monthlyRevenueData,
       lastMonthRevenueData,
-      recentAppointments
+      recentAppointments,
+      validatedCodes
     ] = await Promise.all([
       prisma.appointment.findMany({
         where: { partnerId: partner.id },
         select: { status: true, createdAt: true, dateTime: true }
       }),
-      prisma.transaction.aggregate({
+      prisma.partnerTransaction.aggregate({
         where: {
           partnerId: partner.id,
           status: 'COMPLETED',
-          type: 'INCOME',
-          date: { gte: startOfMonth }
+          type: 'CREDIT',
+          createdAt: { gte: startOfMonth }
         },
         _sum: { amount: true }
       }),
-      prisma.transaction.aggregate({
+      prisma.partnerTransaction.aggregate({
         where: {
           partnerId: partner.id,
           status: 'COMPLETED',
-          type: 'INCOME',
-          date: { gte: lastMonthStart, lte: lastMonthEnd }
+          type: 'CREDIT',
+          createdAt: { gte: lastMonthStart, lte: lastMonthEnd }
         },
         _sum: { amount: true }
       }),
@@ -1335,6 +1337,14 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
             include: { user: { select: { name: true, avatar: true } } }
           }
         }
+      }),
+      prisma.validationCodeLog.findMany({
+        where: { partnerId: partner.id, status: 'valid' },
+        take: 5,
+        orderBy: { timestamp: 'desc' },
+        include: {
+          patient: { select: { user: { select: { name: true, avatar: true } } } }
+        }
       })
     ]);
 
@@ -1342,8 +1352,8 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
     const completedAppointments = appointments.filter(a => a.status === 'COMPLETED').length;
     const upcomingAppointments = appointments.filter(a => a.status === 'SCHEDULED' || a.status === 'CONFIRMED').length;
 
-    const monthlyRevenue = monthlyRevenueData._sum.amount || 0;
-    const lastMonthRevenue = lastMonthRevenueData._sum.amount || 0;
+    const monthlyRevenue = (monthlyRevenueData._sum.amount || 0);
+    const lastMonthRevenue = (lastMonthRevenueData._sum.amount || 0);
     const revenueGrowth = lastMonthRevenue === 0 ? (monthlyRevenue > 0 ? 100 : 0) : Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100);
 
     const thisMonthAppts = appointments.filter(a => a.createdAt >= startOfMonth).length;
@@ -1366,12 +1376,12 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
         nextDay.setDate(date.getDate() + 1);
 
         const [revenue, appts] = await Promise.all([
-          prisma.transaction.aggregate({
+          prisma.partnerTransaction.aggregate({
             where: {
               partnerId: partner.id,
               status: 'COMPLETED',
-              type: 'INCOME',
-              date: { gte: date, lt: nextDay }
+              type: 'CREDIT',
+              createdAt: { gte: date, lt: nextDay }
             },
             _sum: { amount: true }
           }),
@@ -1402,12 +1412,12 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
         nextDay.setDate(date.getDate() + 1);
 
         const [revenue, appts] = await Promise.all([
-          prisma.transaction.aggregate({
+          prisma.partnerTransaction.aggregate({
             where: {
               partnerId: partner.id,
               status: 'COMPLETED',
-              type: 'INCOME',
-              date: { gte: date, lt: nextDay }
+              type: 'CREDIT',
+              createdAt: { gte: date, lt: nextDay }
             },
             _sum: { amount: true }
           }),
@@ -1447,6 +1457,14 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) =>
         patientAvatar: a.patient?.user?.avatar,
         dateTime: a.dateTime,
         status: a.status
+      })),
+      validatedCodes: validatedCodes.map(log => ({
+        id: log.id,
+        code: log.code,
+        patientName: log.patient?.user?.name || log.patientName || 'Paciente',
+        patientAvatar: log.patient?.user?.avatar,
+        timestamp: log.timestamp,
+        status: log.status
       })),
       chartData: chartData
     });
@@ -2915,6 +2933,24 @@ router.post('/reputation/reviews/:reviewId/reply', authenticate, authorize('PART
     res.json(updatedReview);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// --- PRESCRIÇÕES & RECEITAS ---
+router.get('/prescriptions', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findUnique({
+      where: { userId }
+    });
+
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const prescriptions = await prescriptionService.getPrescriptionsByPartner(partner.id);
+    res.json(prescriptions);
+  } catch (err) {
+    console.error('[Prescriptions] Error fetching:', err);
+    res.status(500).json({ error: 'Erro ao buscar prescrições' });
   }
 });
 

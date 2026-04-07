@@ -8,12 +8,12 @@ exports.MedicalHistorySchema = zod_1.z.object({
     doctor: zod_1.z.string().min(1, 'Médico é obrigatório'),
     specialty: zod_1.z.string().min(1, 'Especialidade é obrigatória'),
     description: zod_1.z.string().min(1, 'Descrição é obrigatória'),
-    diagnosis: zod_1.z.string().optional(),
-    treatment: zod_1.z.string().optional(),
-    location: zod_1.z.string().optional(),
+    diagnosis: zod_1.z.string().optional().nullable().or(zod_1.z.literal('')),
+    treatment: zod_1.z.string().optional().nullable().or(zod_1.z.literal('')),
+    location: zod_1.z.string().optional().nullable().or(zod_1.z.literal('')),
     status: zod_1.z.string().default('Concluído'),
-    notes: zod_1.z.string().optional(),
-    attachments: zod_1.z.array(zod_1.z.string()).optional(),
+    notes: zod_1.z.string().optional().nullable().or(zod_1.z.literal('')),
+    attachments: zod_1.z.array(zod_1.z.string()).optional().default([]),
 });
 exports.AnamnesisSchema = zod_1.z.object({
     date: zod_1.z.string().transform(val => new Date(val)),

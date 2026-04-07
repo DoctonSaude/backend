@@ -18,7 +18,7 @@ class OpenAIService {
         try {
             if (!this.client) {
                 console.warn('OpenAI client not initialized. Check OPENAI_API_KEY.');
-                return 'Desculpe, a IA está temporariamente indisponível.';
+                return null;
             }
             const response = await this.client.chat.completions.create({
                 model: this.model,
@@ -31,7 +31,7 @@ class OpenAIService {
         }
         catch (error) {
             console.error('OpenAI API error:', error);
-            return 'Desculpe, ocorreu um erro ao processar sua solicitação.';
+            return null;
         }
     }
 

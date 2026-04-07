@@ -183,6 +183,133 @@ export class IntelligenceService {
     async getInsights(userId: string) {
         return aiInsightService.generatePatientInsights(userId);
     }
+
+    /**
+     * Verifica oportunidades de economia para o paciente (Onda 2)
+     * Compara assinaturas de medicamentos com produtos e promoções ativos
+     */
+    async checkEconomyOpportunities(userId: string) {
+        logger.info(`[IntelligenceService] Checking economy opportunities for user ${userId}`);
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { 
+                person: { 
+                    include: { 
+                        patient: { 
+                            include: { 
+                                medicationSubscriptions: true 
+                            } 
+                        } 
+                    } 
+                } 
+            }
+        });
+
+        if (!user?.person?.patient) return [];
+
+        const patient = user.person.patient;
+        const subscriptions = patient.medicationSubscriptions.filter(s => s.status === 'ACTIVE');
+        const economyInsights = [];
+
+        for (const sub of subscriptions) {
+            // 1. Buscar produtos similares (mesmo nome ou que contenham o nome)
+            const similarProducts = await prisma.pharmacyProduct.findMany({
+                where: {
+                    OR: [
+                        { name: { contains: sub.medicationName, mode: 'insensitive' } },
+                        { description: { contains: sub.medicationName, mode: 'insensitive' } }
+                    ],
+                    isActive: true,
+                    stock: { gt: 0 }
+                },
+                orderBy: { price: 'asc' },
+                take: 5
+            });
+
+            // 2. Buscar promoções ativas para este medicamento
+            const activePromotions = await prisma.pharmacyPromotion.findMany({
+                where: {
+                    title: { contains: sub.medicationName, mode: 'insensitive' },
+                    isActive: true,
+                    startDate: { lte: new Date() },
+                    endDate: { gte: new Date() }
+                },
+                orderBy: { promotionPrice: 'asc' },
+                take: 3
+            });
+
+            // 3. Lógica de Comparação
+            // Buscamos o produto na farmácia atual para ter um preço de referência
+            let currentPrice = 0;
+            if (sub.pharmacyId) {
+                const currentProduct = await prisma.pharmacyProduct.findFirst({
+                    where: {
+                        pharmacyId: sub.pharmacyId,
+                        name: { contains: sub.medicationName, mode: 'insensitive' }
+                    }
+                });
+                currentPrice = currentProduct?.price || 0;
+            }
+
+            // Deal 1: Melhor preço entre produtos (Genéricos ou Marcas concorrentes)
+            const bestProduct = similarProducts[0];
+            if (bestProduct && (currentPrice === 0 || bestProduct.price < currentPrice * 0.9)) {
+                const savings = currentPrice > 0 ? currentPrice - bestProduct.price : 0;
+                economyInsights.push({
+                    type: 'recommendation',
+                    title: `Economia: ${sub.medicationName}`,
+                    description: `Encontramos ${bestProduct.name} por R$ ${bestProduct.price.toFixed(2)} em outra farmácia. ${savings > 0 ? `Economia de R$ ${savings.toFixed(2)}!` : 'Pode ser uma opção mais acessível.'}`,
+                    priority: 'high',
+                    category: 'preventive',
+                    actionable: true,
+                    metadata: {
+                        subscriptionId: sub.id,
+                        recommendedProductId: bestProduct.id,
+                        pharmacyId: bestProduct.pharmacyId,
+                        potentialSavings: savings
+                    }
+                });
+            }
+
+            // Deal 2: Promoções Relâmpago
+            const bestPromo = activePromotions[0];
+            if (bestPromo && (currentPrice === 0 || bestPromo.promotionPrice < currentPrice * 0.85)) {
+                economyInsights.push({
+                    type: 'alert',
+                    title: `Promoção: ${sub.medicationName}`,
+                    description: `Aproveite! ${bestPromo.title} por R$ ${bestPromo.promotionPrice.toFixed(2)} por tempo limitado.`,
+                    priority: 'medium',
+                    category: 'lifestyle',
+                    actionable: true,
+                    metadata: {
+                        subscriptionId: sub.id,
+                        promotionId: bestPromo.id,
+                        pharmacyId: bestPromo.pharmacyId
+                    }
+                });
+            }
+        }
+
+        // Criar insights no banco e notificar
+        for (const insight of economyInsights) {
+            await aiInsightService.createInsight({
+                ...insight,
+                userId: userId
+            });
+
+            await inAppNotificationService.createNotification({
+                userId: userId,
+                type: 'nudge',
+                title: insight.title,
+                message: insight.description,
+                priority: insight.priority === 'high' ? 'high' : 'medium',
+                link: '/patient/assinaturas'
+            });
+        }
+
+        return economyInsights;
+    }
 }
 
 export const intelligenceService = new IntelligenceService();

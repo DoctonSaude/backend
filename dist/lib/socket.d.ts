@@ -9,6 +9,10 @@ export declare class SocketService {
      */
     static sendToUser(userId: string, event: string, data: any): void;
     /**
+     * Envia notificação para todos os administradores
+     */
+    static sendToAdmins(event: string, data: any): void;
+    /**
      * Envia notificação para todos os parceiros/farmácias
      */
     static sendToPartners(event: string, data: any): void;

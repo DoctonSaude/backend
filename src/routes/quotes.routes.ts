@@ -1,7 +1,8 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
 import inAppNotificationService from '../services/inAppNotification.service.js';
+import { SocketService } from '../lib/socket.js';
 
 const router = Router();
 
@@ -179,6 +180,9 @@ router.post('/:id/respond', authenticate, authorize('PARTNER'), async (req, res)
           priority: 'high',
           link: '/patient/orcamentos'
         });
+        
+        // Sincronização em Tempo Real via Socket.io
+        SocketService.sendToUser(patient.userId, 'quoteUpdate', { quoteId: updatedQuote.id });
       }
     }
 
@@ -252,6 +256,10 @@ router.post('/:id/accept', authenticate, authorize('PATIENT'), async (req, res) 
           priority: 'high',
           link: '/partner/agenda'
         });
+
+        // Sincronização em Tempo Real via Socket.io
+        SocketService.sendToUser(partnerUser.userId, 'quoteUpdate', { quoteId: updatedQuote.id });
+        SocketService.sendToUser(patient.userId, 'appointmentUpdate', { quoteId: updatedQuote.id });
       }
     }
 

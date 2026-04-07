@@ -33,6 +33,11 @@ export declare class IntelligenceService {
      * Wrapper para o aiInsightService
      */
     getInsights(userId: string): Promise<import("./aiInsight.service.js").AiInsight[]>;
+    /**
+     * Verifica oportunidades de economia para o paciente (Onda 2)
+     * Compara assinaturas de medicamentos com produtos e promoções ativos
+     */
+    checkEconomyOpportunities(userId: string): Promise<any[]>;
 }
 export declare const intelligenceService: IntelligenceService;
 //# sourceMappingURL=intelligence.service.d.ts.map

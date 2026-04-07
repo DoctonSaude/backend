@@ -20,15 +20,12 @@ app.get('/api/ping', (req, res) => res.status(200).send('PONG'));
 
 import cors from 'cors';
 import { env } from './config/env.js';
-import { allowedOrigins } from './config/cors.js';
+import { isOriginAllowed } from './config/cors.js';
 
 // 1. CORS Middleware (CARREGAR NO TOPO)
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sem origin (como apps mobile ou curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       console.warn(`[CORS] Bloqueado: ${origin}`);
@@ -75,14 +72,17 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { startAutomatedReportsJob } from './jobs/automated-reports.job.js';
 import { startAllCronJobs as startWeeklyJobs } from './jobs/weekly-email.job.js';
 import { startHealthJourneyJob } from './jobs/health-journey.job.js';
+import { FinanceJob } from './jobs/finance.job.js';
 import prisma from './lib/prisma.js';
-
 
 const httpServer = createServer(app);
 
 // Inicializa Sockets
 SocketService.init(httpServer);
 const PORT = process.env.PORT || 3001;
+
+// Init Jobs (Phase 5 Finance)
+FinanceJob.start();
 
 app.get('/', (_req, res) => {
   return res.status(200).json({

@@ -33,9 +33,16 @@ const categories_routes_js_1 = __importDefault(require("./categories.routes.js")
 const ocr_routes_js_1 = __importDefault(require("./ocr.routes.js"));
 const quote_payments_routes_js_1 = __importDefault(require("./quote-payments.routes.js"));
 const healthTool_routes_js_1 = __importDefault(require("./healthTool.routes.js"));
+const pharmacy_routes_js_1 = __importDefault(require("./pharmacy.routes.js")); // NOVO: Farmácia Pro 2.0
+const subscription_routes_js_1 = __importDefault(require("./subscription.routes.js")); // NOVO: Motor de Recorrência
+const family_routes_js_1 = __importDefault(require("./family.routes.js")); // NOVO: Gestão Familiar (Onda 2)
+const timeline_routes_js_1 = __importDefault(require("./timeline.routes.js")); // NOVO: Timeline de Saúde (Onda 3)
 // import chatRoutes from './chat.routes.js';
 const router = (0, express_1.Router)();
+console.log('[API] Registrando rotas de Timeline (Prioridade Máxima)...');
 // 1. API Core Routes
+router.use('/timeline', timeline_routes_js_1.default); // Prioridade máxima (Fallback + Onda 3)
+router.use('/patients/timeline', timeline_routes_js_1.default); // Alias padronizado
 router.use('/auth', auth_routes_js_1.default);
 router.use('/patients', patient_routes_js_1.default);
 router.use('/partners', partner_routes_js_1.default);
@@ -68,6 +75,10 @@ router.use('/telemedicine', telemedicine_routes_js_1.default);
 router.use('/ocr', ocr_routes_js_1.default);
 router.use('/quote-payments', quote_payments_routes_js_1.default);
 router.use('/health-tools', healthTool_routes_js_1.default);
+router.use('/pharmacy', pharmacy_routes_js_1.default); // NOVO: Farmácia Pro 2.0
+router.use('/subscriptions', subscription_routes_js_1.default); // NOVO: Motor de Recorrência
+router.use('/family', family_routes_js_1.default); // NOVO: Gestão Familiar (Onda 2)
+// router.use('/timeline', timelineRoutes); // Movido para o topo
 router.post('/errors', (req, res) => {
     console.error('[FRONTEND ERROR]', req.body);
     res.status(200).json({ success: true });

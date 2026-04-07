@@ -16,9 +16,9 @@ export declare class EngagementService {
         updatedAt: Date;
         title: string;
         category: string;
+        isActive: boolean;
         startDate: Date | null;
         endDate: Date | null;
-        isActive: boolean;
         frequency: string | null;
         points: number;
         icon: string | null;
@@ -39,9 +39,9 @@ export declare class EngagementService {
         updatedAt: Date;
         title: string;
         category: string;
+        isActive: boolean;
         startDate: Date | null;
         endDate: Date | null;
-        isActive: boolean;
         frequency: string | null;
         points: number;
         icon: string | null;
@@ -62,9 +62,9 @@ export declare class EngagementService {
         updatedAt: Date;
         title: string;
         category: string;
+        isActive: boolean;
         startDate: Date | null;
         endDate: Date | null;
-        isActive: boolean;
         frequency: string | null;
         points: number;
         icon: string | null;
@@ -85,9 +85,9 @@ export declare class EngagementService {
         updatedAt: Date;
         title: string;
         category: string;
+        isActive: boolean;
         startDate: Date | null;
         endDate: Date | null;
-        isActive: boolean;
         frequency: string | null;
         points: number;
         icon: string | null;
@@ -107,14 +107,13 @@ export declare class EngagementService {
         personId: string | null;
         name: string | null;
         phone: string | null;
-        tenantId: string | null;
         createdAt: Date;
         updatedAt: Date;
+        tenantId: string | null;
         userId: string | null;
-        cnpj: string | null;
-        specialty: string | null;
         photo: string | null;
         crm: string | null;
+        specialty: string | null;
         specialties: string[];
         institution: string | null;
         experience: number | null;
@@ -134,6 +133,7 @@ export declare class EngagementService {
         acceptsInsurance: boolean;
         acceptsOnline: boolean;
         acceptsTelemedicine: boolean;
+        cnpj: string | null;
         consultationPrice: number | null;
         education: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
         facilities: string[];
@@ -142,6 +142,10 @@ export declare class EngagementService {
         languages: string[];
         settings: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
         workingHours: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
+        planTier: string;
+        planStatus: string;
+        planExpiresAt: Date | null;
+        happyHourConfig: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
     }>;
     /**
      * Proxies to inAppNotification.service's createNotification

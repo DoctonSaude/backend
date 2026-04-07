@@ -57,10 +57,7 @@ const cors_js_1 = require("./config/cors.js");
 // 1. CORS Middleware (CARREGAR NO TOPO)
 exports.app.use((0, cors_1.default)({
     origin: (origin, callback) => {
-        // Permitir requests sem origin (como apps mobile ou curl)
-        if (!origin)
-            return callback(null, true);
-        if (cors_js_1.allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+        if ((0, cors_js_1.isOriginAllowed)(origin)) {
             callback(null, true);
         }
         else {
@@ -104,11 +101,14 @@ const errorHandler_js_1 = require("./middleware/errorHandler.js");
 const automated_reports_job_js_1 = require("./jobs/automated-reports.job.js");
 const weekly_email_job_js_1 = require("./jobs/weekly-email.job.js");
 const health_journey_job_js_1 = require("./jobs/health-journey.job.js");
+const finance_job_js_1 = require("./jobs/finance.job.js");
 const prisma_js_1 = __importDefault(require("./lib/prisma.js"));
 const httpServer = (0, http_1.createServer)(exports.app);
 // Inicializa Sockets
 socket_js_1.SocketService.init(httpServer);
 const PORT = process.env.PORT || 3001;
+// Init Jobs (Phase 5 Finance)
+finance_job_js_1.FinanceJob.start();
 exports.app.get('/', (_req, res) => {
     return res.status(200).json({
         status: 'ok',

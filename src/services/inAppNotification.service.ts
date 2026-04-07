@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { SocketService } from '../lib/socket.js';
 
 export interface CreateInAppNotification {
     userId?: string | null;
@@ -24,6 +25,15 @@ export const createNotification = async (data: CreateInAppNotification) => {
                 read: false
             }
         });
+
+        // Enviar via Socket para tempo real
+        if (created.userId) {
+            SocketService.sendToUser(created.userId, 'new_notification', created);
+        } else {
+            // Notificações de sistema/admin (userId null) vão para todos os admins
+            SocketService.sendToAdmins('new_notification', created);
+        }
+
         return created;
     } catch (error) {
         console.error('Erro ao criar notificação:', error);

@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
 import inAppNotificationService from '../services/inAppNotification.service.js';
@@ -92,7 +92,7 @@ router.post('/', authenticate, async (req, res) => {
 
         // Notificar Admins sobre o novo ticket
         await inAppNotificationService.createNotification({
-            userId: '', // null/empty for system/admin notifications
+            userId: null, 
             type: 'support_ticket',
             title: '🎫 Novo Ticket de Suporte',
             message: `${(req as any).user.name} abriu um ticket: ${subject}`,

@@ -18,6 +18,7 @@ export declare class AppointmentService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            commissionPercent: number | null;
             patientId: string;
             duration: number | null;
             notes: string | null;
@@ -28,6 +29,10 @@ export declare class AppointmentService {
             roomId: string | null;
             equipmentId: string | null;
             professionalId: string | null;
+            doctonFee: number | null;
+            partnerNetPrice: number | null;
+            availableAt: Date | null;
+            payoutStatus: string | null;
         };
         pixDeposit: any;
     }>;
@@ -39,6 +44,7 @@ export declare class AppointmentService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        commissionPercent: number | null;
         patientId: string;
         duration: number | null;
         notes: string | null;
@@ -49,6 +55,10 @@ export declare class AppointmentService {
         roomId: string | null;
         equipmentId: string | null;
         professionalId: string | null;
+        doctonFee: number | null;
+        partnerNetPrice: number | null;
+        availableAt: Date | null;
+        payoutStatus: string | null;
     }>;
 }
 export declare const appointmentService: AppointmentService;

@@ -5,12 +5,12 @@ export declare const MedicalHistorySchema: z.ZodObject<{
     doctor: z.ZodString;
     specialty: z.ZodString;
     description: z.ZodString;
-    diagnosis: z.ZodOptional<z.ZodString>;
-    treatment: z.ZodOptional<z.ZodString>;
-    location: z.ZodOptional<z.ZodString>;
+    diagnosis: z.ZodUnion<[z.ZodNullable<z.ZodOptional<z.ZodString>>, z.ZodLiteral<"">]>;
+    treatment: z.ZodUnion<[z.ZodNullable<z.ZodOptional<z.ZodString>>, z.ZodLiteral<"">]>;
+    location: z.ZodUnion<[z.ZodNullable<z.ZodOptional<z.ZodString>>, z.ZodLiteral<"">]>;
     status: z.ZodDefault<z.ZodString>;
-    notes: z.ZodOptional<z.ZodString>;
-    attachments: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    notes: z.ZodUnion<[z.ZodNullable<z.ZodOptional<z.ZodString>>, z.ZodLiteral<"">]>;
+    attachments: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
 }, "strip", z.ZodTypeAny, {
     type?: string;
     status?: string;
@@ -52,9 +52,9 @@ export declare const AnamnesisSchema: z.ZodObject<{
     plan: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     date?: Date;
+    plan?: string;
     allergies?: string[];
     medications?: string[];
-    plan?: string;
     chiefComplaint?: string;
     currentIllness?: string;
     familyHistory?: string;
@@ -66,9 +66,9 @@ export declare const AnamnesisSchema: z.ZodObject<{
     assessment?: string;
 }, {
     date?: string;
+    plan?: string;
     allergies?: string[];
     medications?: string[];
-    plan?: string;
     chiefComplaint?: string;
     currentIllness?: string;
     familyHistory?: string;
@@ -160,18 +160,18 @@ export declare const MedicationReminderSchema: z.ZodObject<{
     notes: z.ZodNullable<z.ZodOptional<z.ZodString>>;
     prescriptionId: z.ZodNullable<z.ZodOptional<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
+    isActive?: boolean;
     startDate?: Date;
     endDate?: Date;
-    isActive?: boolean;
     notes?: string;
     dosage?: string;
     medicationName?: string;
     times?: string[];
     prescriptionId?: string;
 }, {
+    isActive?: boolean;
     startDate?: string;
     endDate?: string;
-    isActive?: boolean;
     notes?: string;
     dosage?: string;
     medicationName?: string;

@@ -7,6 +7,7 @@ const express_1 = require("express");
 const auth_js_1 = require("../middleware/auth.js");
 const prisma_js_1 = __importDefault(require("../lib/prisma.js"));
 const inAppNotification_service_js_1 = __importDefault(require("../services/inAppNotification.service.js"));
+const socket_js_1 = require("../lib/socket.js");
 const router = (0, express_1.Router)();
 // Rota pública para pacientes solicitarem orçamentos (ou autenticada se preferir)
 router.post('/request', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
@@ -174,6 +175,8 @@ router.post('/:id/respond', auth_js_1.authenticate, (0, auth_js_1.authorize)('PA
                     priority: 'high',
                     link: '/patient/orcamentos'
                 });
+                // Sincronização em Tempo Real via Socket.io
+                socket_js_1.SocketService.sendToUser(patient.userId, 'quoteUpdate', { quoteId: updatedQuote.id });
             }
         }
         res.json({ success: true, quote: updatedQuote });
@@ -241,6 +244,9 @@ router.post('/:id/accept', auth_js_1.authenticate, (0, auth_js_1.authorize)('PAT
                     priority: 'high',
                     link: '/partner/agenda'
                 });
+                // Sincronização em Tempo Real via Socket.io
+                socket_js_1.SocketService.sendToUser(partnerUser.userId, 'quoteUpdate', { quoteId: updatedQuote.id });
+                socket_js_1.SocketService.sendToUser(patient.userId, 'appointmentUpdate', { quoteId: updatedQuote.id });
             }
         }
         res.json({ success: true, quote: updatedQuote });

@@ -140,13 +140,15 @@ router.post('/login', loginValidation, handleValidationErrors, async (req, res, 
         const { password: _p, ...userWithoutPassword } = user;
         // Anexar status de aprovação e tipo de parceiro
         if (user.role === 'PARTNER') {
-            userWithoutPassword.isApproved = user.partner?.isApproved ?? false;
-            userWithoutPassword.partnerType = user.partner?.type ?? 'INDIVIDUAL';
+            const partner = user.partner || await prisma_js_1.default.partner.findUnique({ where: { userId: user.id } });
+            userWithoutPassword.isApproved = partner?.isApproved ?? false;
+            userWithoutPassword.partnerType = partner?.type ?? 'INDIVIDUAL';
         }
         // Anexar status de aprovação de farmácia
         if (user.role === 'PHARMACY') {
-            userWithoutPassword.isApproved = user.pharmacy?.isApproved ?? false;
-            userWithoutPassword.pharmacyName = user.pharmacy?.name ?? '';
+            const pharmacy = user.pharmacy || await prisma_js_1.default.pharmacy.findFirst({ where: { users: { some: { id: user.id } } } });
+            userWithoutPassword.isApproved = pharmacy?.isApproved ?? false;
+            userWithoutPassword.pharmacyName = pharmacy?.name ?? '';
         }
         // Anexar plano e onboarding se for PATIENT
         if (user.role === 'PATIENT') {
@@ -205,7 +207,8 @@ router.get('/validate', async (req, res, next) => {
                 }
                 // Anexar status de aprovação de farmácia
                 if (user.role === 'PHARMACY') {
-                    userWithoutPassword.isApproved = user.pharmacy?.isApproved ?? false;
+                    const isApproved = user.pharmacy?.isApproved || user.isApproved || false;
+                    userWithoutPassword.isApproved = isApproved;
                     userWithoutPassword.pharmacyName = user.pharmacy?.name ?? '';
                 }
                 // Anexar plano e onboarding se for PATIENT
@@ -239,6 +242,7 @@ router.post('/register', registerValidation, handleValidationErrors, async (req,
     try {
         const { password, name, role = 'PATIENT', phone } = req.body;
         const email = req.body.email?.toLowerCase().trim();
+        logger_js_1.logger.info(`--- INICIANDO REGISTRO (V1.0.2) --- Role: ${role}`);
         logger_js_1.logger.info('[auth] Iniciando tentativa de registro', {
             email,
             name,
@@ -270,20 +274,95 @@ router.post('/register', registerValidation, handleValidationErrors, async (req,
         const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
         // Hash da senha
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
-        // Criar usuário no banco - ANTES do e-mail para garantir o registro
-        let newUser;
-        try {
-            newUser = await user_crud_js_1.UserCrud.create({
-                email,
-                password: hashedPassword,
-                name,
-                role,
-                phone
+        // Criar usuário e entidades relacionadas em uma transação para garantir integridade
+        const result = await prisma_js_1.default.$transaction(async (tx) => {
+            // 1. Criar o usuário
+            const newUser = await tx.user.create({
+                data: {
+                    email,
+                    password: hashedPassword,
+                    name,
+                    role,
+                    phone
+                }
             });
+            let pharmacy = null;
+            let partner = null;
+            let patient = null;
+            // 2. Criar entidades específicas baseadas no role
+            if (role === 'PHARMACY') {
+                const { pharmacyName, cnpj } = req.body;
+                pharmacy = await tx.pharmacy.create({
+                    data: {
+                        name: pharmacyName || name,
+                        cnpj: cnpj || null,
+                        isApproved: false
+                    }
+                });
+                // Vincular o usuário à farmácia recém-criada
+                await tx.user.update({
+                    where: { id: newUser.id },
+                    data: { pharmacyId: pharmacy.id }
+                });
+            }
+            else if (role === 'PARTNER') {
+                const { cnpj, specialty, partnerType = 'INDIVIDUAL' } = req.body;
+                partner = await tx.partner.create({
+                    data: {
+                        userId: newUser.id,
+                        name: newUser.name,
+                        type: partnerType,
+                        cnpj: cnpj || null,
+                        specialty: specialty || null,
+                        specialties: specialty ? [specialty] : [],
+                        isApproved: false
+                    }
+                });
+            }
+            else if (role === 'PATIENT') {
+                const tempCpf = `TEMP-${Date.now()}`;
+                patient = await tx.patient.create({
+                    data: {
+                        userId: newUser.id,
+                        cpf: tempCpf,
+                        birthDate: new Date(),
+                    }
+                });
+            }
+            return { newUser, pharmacy, partner, patient };
+        });
+        const { newUser, pharmacy, partner, patient } = result;
+        // Ações pós-transação (não-bloqueantes ou que não dependem da transação)
+        // Notificações
+        if (role === 'PHARMACY' && pharmacy) {
+            await inAppNotification_service_js_1.default.createNotification({
+                userId: null,
+                type: 'pharmacy_approval',
+                title: '💊 Nova Farmácia Registrada',
+                message: `${pharmacy.name} se cadastrou como farmácia e aguarda aprovação.`,
+                priority: 'high',
+                link: '/admin/farmacias'
+            }).catch(err => logger_js_1.logger.error('Erro ao notificar admin sobre nova farmácia:', err));
         }
-        catch (dbError) {
-            logger_js_1.logger.error('[auth] Erro ao criar usuário no banco:', dbError);
-            throw new errorHandler_js_1.ConflictError('Erro ao criar conta. Verifique os dados ou tente novamente.');
+        else if (role === 'PARTNER') {
+            await inAppNotification_service_js_1.default.createNotification({
+                userId: null,
+                type: 'partner_approval',
+                title: '🆕 Novo Parceiro Registrado',
+                message: `${newUser.name} se cadastrou como parceiro e aguarda aprovação.`,
+                priority: 'high',
+                link: '/admin/aprovacoes'
+            }).catch(err => logger_js_1.logger.error('Erro ao notificar admin sobre novo parceiro:', err));
+        }
+        else if (role === 'PATIENT') {
+            await inAppNotification_service_js_1.default.createNotification({
+                userId: null,
+                type: 'new_user',
+                title: '👥 Novo Paciente Registrado',
+                message: `O paciente ${newUser.name} acabou de se cadastrar na plataforma.`,
+                priority: 'medium',
+                link: '/admin/usuarios'
+            }).catch(err => logger_js_1.logger.error('Erro ao notificar admin sobre novo paciente:', err));
         }
         // Enviar email de verificação (não-bloqueante)
         try {
@@ -298,81 +377,6 @@ router.post('/register', registerValidation, handleValidationErrors, async (req,
         }
         catch (emailError) {
             logger_js_1.logger.error('[auth] Erro ao enviar email de verificação (não-bloqueante):', emailError);
-            // Não lançamos erro aqui para permitir que o usuário use o sistema
-        }
-        // Se for parceiro, criar registro de Partner
-        if (role === 'PARTNER') {
-            const { cnpj, specialty, partnerType = 'INDIVIDUAL' } = req.body;
-            await prisma_js_1.default.partner.create({
-                data: {
-                    userId: newUser.id,
-                    name: newUser.name,
-                    type: partnerType,
-                    cnpj: cnpj || null,
-                    specialty: specialty || null,
-                    specialties: specialty ? [specialty] : [],
-                    isApproved: false
-                }
-            });
-            // Notificar Admin sobre o novo parceiro
-            await inAppNotification_service_js_1.default.createNotification({
-                userId: null,
-                type: 'partner_approval',
-                title: '🆕 Novo Parceiro Registrado',
-                message: `${newUser.name} se cadastrou como parceiro e aguarda aprovação.`,
-                priority: 'high',
-                link: '/admin/aprovacoes'
-            }).catch(err => console.error('Erro ao notificar admin sobre novo parceiro:', err));
-        }
-        else if (role === 'PATIENT') {
-            const tempCpf = `TEMP-${Date.now()}`;
-            await prisma_js_1.default.patient.create({
-                data: {
-                    userId: newUser.id,
-                    cpf: tempCpf,
-                    birthDate: new Date(),
-                }
-            }).catch(err => console.error('Erro ao criar registro de paciente:', err));
-        }
-        else if (role === 'PHARMACY') {
-            const { pharmacyName, cnpj } = req.body;
-            let pharmacy;
-            try {
-                pharmacy = await prisma_js_1.default.pharmacy.create({
-                    data: {
-                        name: pharmacyName || name,
-                        cnpj: cnpj || null,
-                        isApproved: false
-                    }
-                });
-            }
-            catch (pharmacyError) {
-                logger_js_1.logger.error('[auth] Erro ao criar registro de farmácia:', {
-                    error: pharmacyError.message,
-                    code: pharmacyError.code,
-                    pharmacyName,
-                    cnpj
-                });
-                // Se for erro de P2002 (Unique constraint), damos um erro mais amigável
-                if (pharmacyError.code === 'P2002') {
-                    return res.status(400).json({ error: 'Este CNPJ já está cadastrado para outra farmácia.' });
-                }
-                throw pharmacyError;
-            }
-            // Vincular usuário à farmácia
-            await prisma_js_1.default.user.update({
-                where: { id: newUser.id },
-                data: { pharmacyId: pharmacy.id }
-            });
-            // Notificar Admin sobre a nova farmácia
-            await inAppNotification_service_js_1.default.createNotification({
-                userId: null,
-                type: 'pharmacy_approval',
-                title: '💊 Nova Farmácia Registrada',
-                message: `${pharmacyName || newUser.name} se cadastrou como farmácia e aguarda aprovação.`,
-                priority: 'high',
-                link: '/admin/farmacias'
-            }).catch(err => console.error('Erro ao notificar admin sobre nova farmácia:', err));
         }
         const updatedUser = await prisma_js_1.default.user.findUnique({
             where: { id: newUser.id },

@@ -93,6 +93,11 @@ class SocketService {
             if (role === 'PHARMACY' || role === 'PARTNER') {
                 socket.join('partners');
             }
+            // Sala de administradores
+            if (role === 'ADMIN' || role === 'MASTER') {
+                socket.join('admins');
+                logger_js_1.logger.info(`Admin ${userId} joined admins room`);
+            }
             socket.on('disconnect', () => {
                 logger_js_1.logger.info(`User disconnected: ${userId}`);
             });
@@ -115,6 +120,14 @@ class SocketService {
     static sendToUser(userId, event, data) {
         if (this.io) {
             this.io.to(`user:${userId}`).emit(event, data);
+        }
+    }
+    /**
+     * Envia notificação para todos os administradores
+     */
+    static sendToAdmins(event, data) {
+        if (this.io) {
+            this.io.to('admins').emit(event, data);
         }
     }
     /**

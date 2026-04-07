@@ -32,6 +32,22 @@ export class AiInsightService {
                     patientChallenges: {
                         where: { status: 'ACTIVE' },
                         include: { challenge: true }
+                    },
+                    anamneses: {
+                        orderBy: { date: 'desc' },
+                        take: 1
+                    },
+                    healthExams: {
+                        orderBy: { date: 'desc' },
+                        take: 5
+                    },
+                    appointments: {
+                        where: { 
+                            dateTime: { gte: new Date() },
+                            status: { not: 'Cancelado' }
+                        },
+                        orderBy: { dateTime: 'asc' },
+                        take: 2
                     }
                 }
             });
@@ -87,6 +103,18 @@ export class AiInsightService {
             const preventiveInsights = this.generatePreventiveTips(patient);
             insights.push(...preventiveInsights);
 
+            // 5. Analisar Anamnese e Histórico (Fase 6)
+            const anamnesisInsights = this.analyzeAnamnesis((patient as any).anamneses || []);
+            insights.push(...anamnesisInsights);
+
+            // 6. Analisar Exames Recentes (Fase 6)
+            const examInsights = this.analyzeRecentExams((patient as any).healthExams || []);
+            insights.push(...examInsights);
+
+            // 7. Analisar Próximas Consultas (Fase 6)
+            const appointmentInsights = this.analyzeUpcomingAppointments((patient as any).appointments || []);
+            insights.push(...appointmentInsights);
+
             // 5. FASE 4: Correlações e Padrões
             const correlationInsights = this.analyzeCorrelations((patient as any).healthLogs || []);
             insights.push(...correlationInsights);
@@ -141,14 +169,53 @@ export class AiInsightService {
                 const priorityScore: Record<string, number> = { high: 3, medium: 2, low: 1 };
                 return priorityScore[b.priority as any] - priorityScore[a.priority as any];
             });
-
         } catch (error) {
-            console.error('Erro ao gerar insights de IA:', error);
+            console.error('Erro ao gerar insights:', error);
             return [];
         }
     }
-
-    private analyzeMentalHealth(logs: any[]): AiInsight[] {
+ 
+     /**
+      * Cria um insight manualmente
+      */
+     public async createInsight(data: {
+         userId?: string;
+         patientId?: string;
+         type: string;
+         title: string;
+         description?: string;
+         priority: string;
+         category: string;
+         actionable: boolean;
+         metadata?: any;
+     }) {
+         let patientId = data.patientId;
+ 
+         if (!patientId && data.userId) {
+             const patient = await prisma.patient.findUnique({
+                 where: { userId: data.userId }
+             });
+             patientId = patient?.id;
+         }
+ 
+         if (!patientId) return null;
+ 
+         return prisma.patientInsight.create({
+             data: {
+                 patientId,
+                 type: data.type,
+                 title: data.title,
+                 description: data.description || '',
+                 priority: data.priority,
+                 category: data.category,
+                 actionable: data.actionable,
+                 metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+                 isRead: false
+             }
+         });
+     }
+ 
+     private analyzeMentalHealth(logs: any[]): AiInsight[] {
         const insights: AiInsight[] = [];
         const moodLogs = logs.filter(l => l.type === 'MOOD');
 
@@ -293,6 +360,98 @@ export class AiInsightService {
                 actionable: true,
                 createdAt: new Date().toISOString()
             });
+        }
+
+        return insights;
+    }
+
+    private analyzeAnamnesis(anamneses: any[]): AiInsight[] {
+        const insights: AiInsight[] = [];
+        if (anamneses.length === 0) {
+            insights.push({
+                id: 'anamnesis_missing',
+                type: 'recommendation',
+                title: 'Complete sua Anamnese',
+                description: 'Ainda não temos seu histórico de saúde completo. Preencher sua anamnese ajuda a IA a ser mais precisa.',
+                priority: 'high',
+                category: 'preventive',
+                actionable: true,
+                createdAt: new Date().toISOString()
+            });
+            return insights;
+        }
+
+        const latest = anamneses[0];
+        if (latest.chiefComplaint?.toLowerCase().includes('dor') || latest.assessment?.toLowerCase().includes('crônico')) {
+            insights.push({
+                id: 'anamnesis_chronic_alert',
+                type: 'tip',
+                title: 'Acompanhamento de Condição Crônica',
+                description: 'Com base no seu histórico, lembre-se de manter a regularidade nas medições de pressão e glicemia.',
+                priority: 'medium',
+                category: 'preventive',
+                actionable: false,
+                createdAt: new Date().toISOString()
+            });
+        }
+
+        return insights;
+    }
+
+    private analyzeRecentExams(exams: any[]): AiInsight[] {
+        const insights: AiInsight[] = [];
+        const recentExamsCount = exams.length;
+
+        if (recentExamsCount > 0) {
+            insights.push({
+                id: 'exams_recent_activity',
+                type: 'achievement',
+                title: 'Check-up em Dia',
+                description: `Você realizou ${recentExamsCount} exames recentemente. Manter seus exames atualizados na plataforma ajuda no monitoramento.`,
+                priority: 'low',
+                category: 'preventive',
+                actionable: false,
+                createdAt: new Date().toISOString()
+            });
+
+            // Alerta de urgência em exames
+            const urgentExams = exams.filter((e: any) => e.urgency === 'Urgente');
+            if (urgentExams.length > 0) {
+                insights.push({
+                    id: 'exams_urgency_alert',
+                    type: 'alert',
+                    title: 'Atenção aos Exames',
+                    description: 'Você possui exames marcados como urgentes. Entre em contato com seu médico para discutir os resultados.',
+                    priority: 'high',
+                    category: 'preventive',
+                    actionable: true,
+                    createdAt: new Date().toISOString()
+                });
+            }
+        }
+
+        return insights;
+    }
+
+    private analyzeUpcomingAppointments(appointments: any[]): AiInsight[] {
+        const insights: AiInsight[] = [];
+        
+        if (appointments.length > 0) {
+            const next = appointments[0];
+            const diffDays = Math.ceil((new Date(next.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diffDays <= 3 && diffDays >= 0) {
+                insights.push({
+                    id: 'appointment_soon',
+                    type: 'recommendation',
+                    title: 'Consulta Próxima',
+                    description: `Você tem uma consulta de ${next.specialty || 'clínica'} em ${diffDays} dia(s). Prepare sua lista de sintomas e dúvidas.`,
+                    priority: 'high',
+                    category: 'lifestyle',
+                    actionable: true,
+                    createdAt: new Date().toISOString()
+                });
+            }
         }
 
         return insights;

@@ -4,13 +4,34 @@ import openAIService from '../services/ai/openai.service.js';
 
 export class HealthToolController {
   /**
+   * Resolver ID real do paciente a partir do usuário autenticado ou ID fornecido
+   */
+  private async resolvePatientId(req: any, providedId?: string): Promise<string | null> {
+    const userId = req.user?.userId;
+    
+    // Se temos o userId na sessão, ele é soberano
+    if (userId) {
+      const patient = await prisma.patient.findUnique({ where: { userId } });
+      if (patient) return patient.id;
+    }
+
+    // Fallback para o ID fornecido (se existir)
+    return providedId || null;
+  }
+
+  /**
    * Analisar sintomas usando IA (OpenAI)
    */
-  async analyzeSymptoms(req: Request, res: Response) {
+  analyzeSymptoms = async (req: Request, res: Response) => {
     try {
-      const { patientId, symptoms } = req.body;
+      const { patientId: bodyPatientId, symptoms } = req.body;
+      const patientId = await this.resolvePatientId(req, bodyPatientId);
 
-      if (!patientId || !symptoms || !Array.isArray(symptoms)) {
+      if (!patientId) {
+        return res.status(400).json({ error: 'Id do paciente não encontrado ou não vinculado ao seu usuário.' });
+      }
+
+      if (!symptoms || !Array.isArray(symptoms)) {
         return res.status(400).json({ error: 'Dados inválidos. patientId e symptoms (array) são obrigatórios.' });
       }
 
@@ -52,6 +73,10 @@ export class HealthToolController {
         { role: 'user', content: prompt }
       ], { temperature: 0.3 });
 
+      if (!aiResponse) {
+        return res.status(503).json({ error: 'O serviço de Inteligência Artificial está temporariamente indisponível. Por favor, tente novamente mais tarde.' });
+      }
+
       // Tentar parsear a resposta da IA
       let result;
       try {
@@ -61,7 +86,7 @@ export class HealthToolController {
         result = JSON.parse(jsonStr);
       } catch (e) {
         console.error('Erro ao parsear resposta da IA:', aiResponse);
-        return res.status(500).json({ error: 'Erro na análise da IA. Formato de resposta inválido.' });
+        return res.status(422).json({ error: 'Não foi possível processar a resposta da análise. Tente descrever seus sintomas com mais detalhes.' });
       }
 
       // Salvar no Banco de Dados
@@ -83,11 +108,16 @@ export class HealthToolController {
   /**
    * Verificar interações medicamentosas usando IA
    */
-  async checkInteractions(req: Request, res: Response) {
+  checkInteractions = async (req: Request, res: Response) => {
     try {
-      const { patientId, newMedications } = req.body;
+      const { patientId: bodyPatientId, newMedications } = req.body;
+      const patientId = await this.resolvePatientId(req, bodyPatientId);
 
-      if (!patientId || !newMedications) {
+      if (!patientId) {
+        return res.status(400).json({ error: 'Paciente não identificado.' });
+      }
+
+      if (!newMedications) {
         return res.status(400).json({ error: 'patientId e newMedications são obrigatórios.' });
       }
 
@@ -126,9 +156,13 @@ export class HealthToolController {
       `;
 
       const aiResponse = await openAIService.chat([
-        { role: 'system', content: 'Você é um especialista em farmacologia clínica.' },
+        { role: 'system', content: 'Você é um especialisa em farmacologia clínica.' },
         { role: 'user', content: prompt }
       ], { temperature: 0.2 });
+
+      if (!aiResponse) {
+        return res.status(503).json({ error: 'Verificação de interações indisponível no momento.' });
+      }
 
       let result;
       try {
@@ -136,7 +170,7 @@ export class HealthToolController {
         const jsonStr = jsonMatch ? jsonMatch[0] : aiResponse;
         result = JSON.parse(jsonStr);
       } catch (e) {
-        return res.status(500).json({ error: 'Erro ao processar interações via IA.' });
+        return res.status(422).json({ error: 'Erro ao processar interações via IA.' });
       }
 
       return res.json(result);
@@ -149,12 +183,13 @@ export class HealthToolController {
   /**
    * Obter histórico de ferramentas de saúde
    */
-  async getHistory(req: Request, res: Response) {
+  getHistory = async (req: Request, res: Response) => {
     try {
-      const { patientId } = req.query;
+      const { patientId: bodyPatientId } = req.query;
+      const patientId = await this.resolvePatientId(req, bodyPatientId as string);
 
       if (!patientId) {
-        return res.status(400).json({ error: 'patientId é necessário.' });
+        return res.status(400).json({ error: 'patientId não resolvido.' });
       }
 
       const symptomHistory = await prisma.symptomAnalysis.findMany({
@@ -165,7 +200,7 @@ export class HealthToolController {
 
       // Também buscar logs de saúde que sejam do tipo 'CALCULATION'
       const calculationHistory = await prisma.healthLog.findMany({
-        where: { 
+        where: {
           patientId: patientId as string,
           type: { in: ['CALCULATION', 'IMC', 'BMI', 'CREATININE_CLEARANCE', 'IDEAL_WEIGHT'] }
         },
@@ -178,31 +213,42 @@ export class HealthToolController {
         calculations: calculationHistory
       });
     } catch (error) {
-      return res.status(500).json({ error: 'Erro ao buscar histórico.' });
+      console.error('Erro ao buscar histórico:', error);
+      return res.status(500).json({ error: 'Erro interno ao buscar histórico de saúde.' });
     }
   }
 
   /**
    * Salvar resultado de calculadoras
    */
-  async saveCalculation(req: Request, res: Response) {
+  saveCalculation = async (req: Request, res: Response) => {
     try {
-      const { patientId, type, value, unit, notes } = req.body;
+      const { patientId: bodyPatientId, type, value, unit, notes } = req.body;
+      const patientId = await this.resolvePatientId(req, bodyPatientId);
+
+      if (!patientId) {
+        return res.status(400).json({ error: 'Id de paciente inválido ou não autenticado.' });
+      }
+
+      if (!type) {
+        return res.status(400).json({ error: 'O tipo de cálculo é obrigatório.' });
+      }
 
       const log = await prisma.healthLog.create({
         data: {
           patientId,
-          type: type.toUpperCase(),
+          type: String(type).toUpperCase(),
           value: String(value),
-          unit,
-          notes,
+          unit: unit || null,
+          notes: notes || null,
           logDate: new Date()
         }
       });
 
       return res.status(201).json(log);
     } catch (error) {
-      return res.status(500).json({ error: 'Erro ao salvar cálculo.' });
+      console.error('Erro ao salvar cálculo:', error);
+      return res.status(500).json({ error: 'Erro interno ao salvar cálculo médico.' });
     }
   }
 }

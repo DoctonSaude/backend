@@ -94,7 +94,7 @@ router.post('/', auth_js_1.authenticate, async (req, res) => {
         });
         // Notificar Admins sobre o novo ticket
         await inAppNotification_service_js_1.default.createNotification({
-            userId: '', // null/empty for system/admin notifications
+            userId: null,
             type: 'support_ticket',
             title: '🎫 Novo Ticket de Suporte',
             message: `${req.user.name} abriu um ticket: ${subject}`,

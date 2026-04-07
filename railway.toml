@@ -1,4 +1,4 @@
-# redeploy: 2026-03-20
+# redeploy: 2026-04-04 (Forçando deploy manual)
 [build]
 builder = "DOCKERFILE"
 

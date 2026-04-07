@@ -1,24 +1,22 @@
 export declare class TelemedicineService {
+    private client;
     /**
-     * Inicia uma sessão de telemedicina para um agendamento
+     * Cria uma sala no Daily.co para o agendamento
      */
-    createSession(appointmentId: string, videoRoomId: string): Promise<any>;
+    createRoom(appointmentId: string): Promise<any>;
+    /**
+     * Gera um token de acesso para a sala
+     */
+    generateToken(roomName: string, userId: string, userName: string, isOwner?: boolean): Promise<any>;
     /**
      * Busca uma sessão ativa pelo ID do agendamento
      */
     getSessionByAppointment(appointmentId: string): Promise<any>;
     /**
-     * Inicia a chamada (médico ou paciente entrou)
+     * Finaliza a sessão no banco
      */
-    startSession(sessionId: string): Promise<any>;
-    /**
-     * Finaliza a sessão
-     */
-    endSession(sessionId: string): Promise<any>;
-    /**
-     * Mock de geração de token de vídeo (Twilio/WebRTC)
-     */
-    generateToken(userId: string, roomId: string): Promise<string>;
+    endSession(appointmentId: string): Promise<any>;
 }
 export declare const telemedicineService: TelemedicineService;
+export default telemedicineService;
 //# sourceMappingURL=telemedicine.service.d.ts.map

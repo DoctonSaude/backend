@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteAllForUser = exports.deleteNotification = exports.markAllAsRead = exports.markAsRead = exports.getNotificationsByUser = exports.createNotification = void 0;
 const prisma_js_1 = __importDefault(require("../lib/prisma.js"));
+const socket_js_1 = require("../lib/socket.js");
 const createNotification = async (data) => {
     try {
         const created = await prisma_js_1.default.notification.create({
@@ -19,6 +20,14 @@ const createNotification = async (data) => {
                 read: false
             }
         });
+        // Enviar via Socket para tempo real
+        if (created.userId) {
+            socket_js_1.SocketService.sendToUser(created.userId, 'new_notification', created);
+        }
+        else {
+            // Notificações de sistema/admin (userId null) vão para todos os admins
+            socket_js_1.SocketService.sendToAdmins('new_notification', created);
+        }
         return created;
     }
     catch (error) {

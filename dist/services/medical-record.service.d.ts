@@ -53,14 +53,13 @@ export declare class MedicalRecordService {
             personId: string | null;
             name: string | null;
             phone: string | null;
-            tenantId: string | null;
             createdAt: Date;
             updatedAt: Date;
+            tenantId: string | null;
             userId: string | null;
-            cnpj: string | null;
-            specialty: string | null;
             photo: string | null;
             crm: string | null;
+            specialty: string | null;
             specialties: string[];
             institution: string | null;
             experience: number | null;
@@ -80,6 +79,7 @@ export declare class MedicalRecordService {
             acceptsInsurance: boolean;
             acceptsOnline: boolean;
             acceptsTelemedicine: boolean;
+            cnpj: string | null;
             consultationPrice: number | null;
             education: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
             facilities: string[];
@@ -88,12 +88,17 @@ export declare class MedicalRecordService {
             languages: string[];
             settings: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
             workingHours: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
+            planTier: string;
+            planStatus: string;
+            planExpiresAt: Date | null;
+            happyHourConfig: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
         };
         appointment: {
             status: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            commissionPercent: number | null;
             patientId: string;
             duration: number | null;
             notes: string | null;
@@ -104,6 +109,10 @@ export declare class MedicalRecordService {
             roomId: string | null;
             equipmentId: string | null;
             professionalId: string | null;
+            doctonFee: number | null;
+            partnerNetPrice: number | null;
+            availableAt: Date | null;
+            payoutStatus: string | null;
         };
     } & {
         id: string;

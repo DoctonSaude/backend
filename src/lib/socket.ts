@@ -113,6 +113,12 @@ export class SocketService {
                 socket.join('partners');
             }
 
+            // Sala de administradores
+            if (role === 'ADMIN' || role === 'MASTER') {
+                socket.join('admins');
+                logger.info(`Admin ${userId} joined admins room`);
+            }
+
             socket.on('disconnect', () => {
                 logger.info(`User disconnected: ${userId}`);
             });
@@ -143,6 +149,15 @@ export class SocketService {
     }
 
     /**
+     * Envia notificação para todos os administradores
+     */
+    static sendToAdmins(event: string, data: any) {
+        if (this.io) {
+            this.io.to('admins').emit(event, data);
+        }
+    }
+
+    /**
      * Envia notificação para todos os parceiros/farmácias
      */
     static sendToPartners(event: string, data: any) {
@@ -151,3 +166,4 @@ export class SocketService {
         }
     }
 }
+

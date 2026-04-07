@@ -15,18 +15,18 @@ export declare class PatientService {
                     name: string;
                     createdAt: Date;
                     updatedAt: Date;
+                    isActive: boolean;
+                    order: number;
                     key: string | null;
                     price: number;
                     duration: string | null;
                     interval: string | null;
                     features: string | null;
                     featuresArray: string[];
-                    isActive: boolean;
                     ctaLink: string | null;
                     ctaText: string | null;
                     displayPrice: string | null;
                     isPopular: boolean;
-                    order: number;
                 };
             } & {
                 status: string;
@@ -44,47 +44,49 @@ export declare class PatientService {
             level: number;
             id: string;
             personId: string | null;
-            tenantId: string | null;
             createdAt: Date;
             updatedAt: Date;
+            tenantId: string | null;
             userId: string | null;
             address: string | null;
             city: string | null;
             state: string | null;
             zipCode: string | null;
             settings: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
-            dateOfBirth: Date | null;
-            birthDate: Date | null;
-            gender: string | null;
-            cpf: string | null;
-            bloodType: string | null;
             allergies: string[];
+            birthDate: Date | null;
+            bloodType: string | null;
             chronicDiseases: string[];
+            cpf: string | null;
             currentMedications: string[];
-            medications: string | null;
+            currentStreak: number;
             emergencyContact: string | null;
             emergencyPhone: string | null;
-            archetype: string | null;
+            gender: string | null;
             healthPoints: number;
-            experiencePoints: number;
-            currentStreak: number;
-            longestStreak: number;
             lastActiveDate: Date | null;
+            longestStreak: number;
+            archetype: string | null;
+            blockchainAddress: string | null;
+            dateOfBirth: Date | null;
+            encryptionPublicKey: string | null;
+            experiencePoints: number;
+            healthGoals: string[];
             levelTier: string | null;
             levelTitle: string | null;
-            healthGoals: string[];
             lifestyle: import("../../lib/generated/prisma/runtime/library.js").JsonValue | null;
+            medications: string | null;
             onboardingCompleted: boolean;
             referralCode: string | null;
             referralCount: number;
             referralEarnings: number;
             referredBy: string | null;
-            totalChallengesCompleted: number;
             totalBadgesEarned: number;
+            totalChallengesCompleted: number;
             userIntent: string | null;
             userPriority: string | null;
-            blockchainAddress: string | null;
-            encryptionPublicKey: string | null;
+            familyGroupId: string | null;
+            familyRole: string | null;
         };
         stats: {
             totalAppointments: number;
@@ -164,9 +166,34 @@ export declare class PatientService {
         };
     }>;
     /**
-     * Invalida o cache do dashboard para um usuário
+     * Obtém a timeline médica consolidada do paciente
      */
-    invalidateDashboard(userId: string): Promise<void>;
+    getMedicalTimeline(userId: string): Promise<({
+        id: string;
+        date: Date;
+        type: string;
+        title: string;
+        description: string;
+        status: string;
+        category: string;
+        icon: string;
+        partner: string;
+        avatar: string;
+    } | {
+        id: string;
+        date: Date;
+        type: string;
+        title: string;
+        description: string;
+        status: string;
+        category: string;
+        icon: string;
+        attachments: string[];
+    })[]>;
+    /**
+     * Invalida o cache da timeline para um usuário
+     */
+    invalidateTimeline(userId: string): Promise<void>;
 }
 export declare const patientService: PatientService;
 //# sourceMappingURL=patient.service.d.ts.map

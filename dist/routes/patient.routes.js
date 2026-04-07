@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const socket_js_1 = require("../lib/socket.js");
 const chronobiology_service_js_1 = require("../services/chronobiology.service.js");
 const auth_js_1 = require("../middleware/auth.js");
 const prisma_js_1 = __importDefault(require("../lib/prisma.js"));
@@ -16,6 +17,7 @@ const patient_schema_js_1 = require("../schemas/patient.schema.js");
 const aiInsight_service_js_1 = require("../services/aiInsight.service.js");
 const patient_service_js_1 = require("../services/patient.service.js");
 const aiRecommendation_service_js_1 = require("../services/aiRecommendation.service.js"); // NOVO: Motor de IA Preditiva
+const gamification_service_js_1 = require("../services/gamification.service.js");
 const router = (0, express_1.Router)();
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
@@ -66,7 +68,7 @@ const validate = (schema) => (req, res, next) => {
     }
     catch (error) {
         console.warn('[Validation Error]', error.errors || error);
-        return res.status(400).json({ error: 'Erro de validação', details: error.errors });
+        return res.status(400).json({ error: 'Erro de validação', details: error.issues || error.errors || [] });
     }
 };
 // Rota para logs de analytics do paciente
@@ -469,6 +471,8 @@ router.post('/appointments/:id/rate', auth_js_1.authenticate, (0, auth_js_1.auth
         loyalty_service_js_1.LoyaltyService.processReviewPoints(patient.id, review.id).catch(err => {
             console.error('Erro ao atribuir pontos por avaliação:', err);
         });
+        // Notificar atualização de agendamento (status/avaliação)
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'appointmentUpdate', { appointmentId: id, status: 'RATED' });
         res.status(201).json(review);
     }
     catch (error) {
@@ -511,6 +515,13 @@ router.post('/health-logs', auth_js_1.authenticate, (0, auth_js_1.authorize)('PA
                 logDate: logDate ? new Date(logDate) : new Date()
             }
         });
+        // GATILHO DE DESAFIO (Conectividade Gamification)
+        let actionType = type;
+        if (type.toLowerCase().includes('á') || type.toLowerCase() === 'agua')
+            actionType = 'water';
+        if (type.toLowerCase().includes('pes') || type.toLowerCase() === 'peso')
+            actionType = 'weight';
+        await gamification_service_js_1.wearablesPilotService.triggerChallengeAction(req.user?.userId, actionType, Number(value) || 1);
         // Se for um log de humor, dar 5 pontos de XP (Gamificação)
         if (type === 'MOOD') {
             const today = new Date();
@@ -535,6 +546,10 @@ router.post('/health-logs', auth_js_1.authenticate, (0, auth_js_1.authorize)('PA
                 }
             }
         }
+        // Notificar atualização de logs de saúde
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'healthLogsUpdate', newLog);
+        // Timeline também é afetada
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'healthLog', id: newLog.id });
         res.status(201).json(newLog);
     }
     catch (error) {
@@ -563,6 +578,8 @@ router.put('/health-logs/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)(
                 logDate: logDate ? new Date(logDate) : undefined
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'healthLogsUpdate', updatedLog);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'healthLog', id: updatedLog.id });
         res.json(updatedLog);
     }
     catch (error) {
@@ -585,6 +602,8 @@ router.delete('/health-logs/:id', auth_js_1.authenticate, (0, auth_js_1.authoriz
         await prisma_js_1.default.healthLog.delete({
             where: { id }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'healthLogsUpdate', { id, deleted: true });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'healthLog', id, deleted: true });
         res.json({ message: 'Registro excluído com sucesso' });
     }
     catch (error) {
@@ -815,6 +834,8 @@ router.post('/subscription', auth_js_1.authenticate, (0, auth_js_1.authorize)('P
             },
             include: { plan: true }
         });
+        // 🎁 Gamificação: Bonificação por nova assinatura
+        await loyalty_service_js_1.LoyaltyService.awardPoints(patient.id, 100, 'SUBSCRIPTION_AWARD', `Bônus por assinatura do Plano ID: ${planId}`);
         res.status(201).json(subscription);
     }
     catch (error) {
@@ -848,6 +869,8 @@ router.put('/subscription/change', auth_js_1.authenticate, (0, auth_js_1.authori
             },
             include: { plan: true }
         });
+        // 🎁 Gamificação: Bonificação por upgrade/mudança de assinatura
+        await loyalty_service_js_1.LoyaltyService.awardPoints(patient.id, 50, 'SUBSCRIPTION_CHANGE', `Bônus por mudança para o Plano ID: ${planId}`);
         res.json(subscription);
     }
     catch (error) {
@@ -926,6 +949,9 @@ router.put('/profile', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT
         if (patientData.birthDate) {
             patientData.birthDate = new Date(patientData.birthDate);
         }
+        else if (patientData.birthDate === '') {
+            patientData.birthDate = null;
+        }
         const patient = await prisma_js_1.default.patient.findUnique({
             where: { userId: req.user?.userId }
         });
@@ -946,6 +972,7 @@ router.put('/profile', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT
                 }
             })
         ]);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'patientProfileUpdate', { ...updatedPatient, user: updatedUser });
         res.json({ ...updatedPatient, user: updatedUser });
     }
     catch (error) {
@@ -1086,6 +1113,9 @@ router.post('/onboarding', auth_js_1.authenticate, (0, auth_js_1.authorize)('PAT
         catch (aiErr) {
             console.error('[ONBOARDING] IA Warning: falha ao inicializar perfil preditivo:', aiErr.message);
         }
+        // Notificar conclusão de onboarding (atualiza perfil e logs)
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'patientProfileUpdate', updatedPatient);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'healthLogsUpdate', { type: 'onboarding' });
         return res.status(200).json({
             message: 'Onboarding concluído!',
             archetype,
@@ -1098,7 +1128,7 @@ router.post('/onboarding', auth_js_1.authenticate, (0, auth_js_1.authorize)('PAT
     }
 });
 // Rotas de Favoritos
-router.get('/favorites', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res, next) => {
+router.get('/favorites', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
     try {
         const userId = req.user.userId;
         const patient = await prisma_js_1.default.patient.findUnique({
@@ -1117,7 +1147,7 @@ router.get('/favorites', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIE
         res.status(500).json({ error: 'Erro ao buscar favoritos' });
     }
 });
-router.post('/favorites/:partnerId/toggle', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res, next) => {
+router.post('/favorites/:partnerId/toggle', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
     try {
         const { partnerId } = req.params;
         const userId = req.user?.userId;
@@ -1224,7 +1254,11 @@ router.post('/medical-history', auth_js_1.authenticate, (0, auth_js_1.authorize)
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const newRecord = await prisma_js_1.default.medicalHistory.create({
             data: {
                 ...data,
@@ -1232,6 +1266,8 @@ router.post('/medical-history', auth_js_1.authenticate, (0, auth_js_1.authorize)
                 date: new Date(req.body.date)
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'medicalHistoryUpdate', newRecord);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'medicalHistory', id: newRecord.id });
         res.status(201).json(newRecord);
     }
     catch (error) {
@@ -1245,7 +1281,11 @@ router.put('/medical-history/:id', auth_js_1.authenticate, (0, auth_js_1.authori
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id: _, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const updated = await prisma_js_1.default.medicalHistory.update({
             where: { id, patientId: patient.id },
             data: {
@@ -1253,6 +1293,8 @@ router.put('/medical-history/:id', auth_js_1.authenticate, (0, auth_js_1.authori
                 date: req.body.date ? new Date(req.body.date) : undefined
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'medicalHistoryUpdate', updated);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'medicalHistory', id: updated.id });
         res.json(updated);
     }
     catch (error) {
@@ -1269,6 +1311,8 @@ router.delete('/medical-history/:id', auth_js_1.authenticate, (0, auth_js_1.auth
         await prisma_js_1.default.medicalHistory.delete({
             where: { id, patientId: patient.id }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'medicalHistoryUpdate', { id, deleted: true });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'medicalHistory', id, deleted: true });
         res.json({ message: 'Registro excluído com sucesso' });
     }
     catch (error) {
@@ -1298,7 +1342,11 @@ router.post('/anamnesis', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATI
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const newRecord = await prisma_js_1.default.anamnesis.create({
             data: {
                 ...data,
@@ -1306,6 +1354,7 @@ router.post('/anamnesis', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATI
                 date: new Date(req.body.date)
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'anamnesisUpdate', newRecord);
         res.status(201).json(newRecord);
     }
     catch (error) {
@@ -1319,7 +1368,11 @@ router.put('/anamnesis/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)('P
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id: _, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const updated = await prisma_js_1.default.anamnesis.update({
             where: { id, patientId: patient.id },
             data: {
@@ -1327,6 +1380,7 @@ router.put('/anamnesis/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)('P
                 date: req.body.date ? new Date(req.body.date) : undefined
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'anamnesisUpdate', updated);
         res.json(updated);
     }
     catch (error) {
@@ -1342,6 +1396,7 @@ router.delete('/anamnesis/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)
         await prisma_js_1.default.anamnesis.delete({
             where: { id, patientId: patient.id }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'anamnesisUpdate', { id, deleted: true });
         res.json({ message: 'Anamnese excluída com sucesso' });
     }
     catch (error) {
@@ -1369,7 +1424,11 @@ router.post('/exams', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const newRecord = await prisma_js_1.default.healthExam.create({
             data: {
                 ...data,
@@ -1377,6 +1436,10 @@ router.post('/exams', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'
                 date: new Date(req.body.date)
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'examsUpdate', newRecord);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'exam', id: newRecord.id });
+        // GATILHO DE DESAFIO (Conectividade Gamification)
+        await gamification_service_js_1.wearablesPilotService.triggerChallengeAction(req.user?.userId, 'exam_added');
         res.status(201).json(newRecord);
     }
     catch (error) {
@@ -1390,7 +1453,11 @@ router.put('/exams/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIE
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id: _, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const updated = await prisma_js_1.default.healthExam.update({
             where: { id, patientId: patient.id },
             data: {
@@ -1398,6 +1465,8 @@ router.put('/exams/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIE
                 date: req.body.date ? new Date(req.body.date) : undefined
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'examsUpdate', updated);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'exam', id: updated.id });
         res.json(updated);
     }
     catch (error) {
@@ -1413,6 +1482,8 @@ router.delete('/exams/:id', auth_js_1.authenticate, (0, auth_js_1.authorize)('PA
         await prisma_js_1.default.healthExam.delete({
             where: { id, patientId: patient.id }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'examsUpdate', { id, deleted: true });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'exam', id, deleted: true });
         res.json({ message: 'Exame excluído com sucesso' });
     }
     catch (error) {
@@ -1441,7 +1512,11 @@ router.post('/prescriptions', auth_js_1.authenticate, (0, auth_js_1.authorize)('
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const newRecord = await prisma_js_1.default.prescription.create({
             data: {
                 ...data,
@@ -1458,6 +1533,8 @@ router.post('/prescriptions', auth_js_1.authenticate, (0, auth_js_1.authorize)('
         catch (aiErr) {
             console.error('[PRESCRIPTION IA] Warning: falha ao processar predição:', aiErr.message);
         }
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'prescriptionUpdate', newRecord);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'prescription', id: newRecord.id });
         res.status(201).json(newRecord);
     }
     catch (error) {
@@ -1471,7 +1548,11 @@ router.put('/prescriptions/:id', auth_js_1.authenticate, (0, auth_js_1.authorize
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id: _, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const updated = await prisma_js_1.default.prescription.update({
             where: { id, patientId: patient.id },
             data: {
@@ -1481,6 +1562,8 @@ router.put('/prescriptions/:id', auth_js_1.authenticate, (0, auth_js_1.authorize
                 date: req.body.date ? new Date(req.body.date) : undefined
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'prescriptionUpdate', updated);
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'prescription', id: updated.id });
         res.json(updated);
     }
     catch (error) {
@@ -1497,6 +1580,8 @@ router.delete('/prescriptions/:id', auth_js_1.authenticate, (0, auth_js_1.author
         await prisma_js_1.default.prescription.delete({
             where: { id, patientId: patient.id }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'prescriptionUpdate', { id, deleted: true });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'timelineUpdate', { type: 'prescription', id, deleted: true });
         res.json({ message: 'Prescrição excluída com sucesso' });
     }
     catch (error) {
@@ -1526,13 +1611,18 @@ router.post('/medication-reminders', auth_js_1.authenticate, (0, auth_js_1.autho
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const newRecord = await prisma_js_1.default.medicationReminder.create({
             data: {
                 ...data,
                 patientId: patient.id
             }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'medicationRemindersUpdate', { reminder: newRecord });
         res.status(201).json(newRecord);
     }
     catch (error) {
@@ -1546,11 +1636,16 @@ router.put('/medication-reminders/:id', auth_js_1.authenticate, (0, auth_js_1.au
         const patient = await prisma_js_1.default.patient.findUnique({ where: { userId: req.user?.userId } });
         if (!patient)
             return res.status(404).json({ error: 'Paciente não encontrado' });
-        const { id: _, createdAt, updatedAt, patientId, ...data } = req.body;
+        const data = { ...req.body };
+        delete data.id;
+        delete data.createdAt;
+        delete data.updatedAt;
+        delete data.patientId;
         const updated = await prisma_js_1.default.medicationReminder.update({
             where: { id, patientId: patient.id },
             data
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'medicationRemindersUpdate', updated);
         res.json(updated);
     }
     catch (error) {
@@ -1567,6 +1662,7 @@ router.delete('/medication-reminders/:id', auth_js_1.authenticate, (0, auth_js_1
         await prisma_js_1.default.medicationReminder.delete({
             where: { id, patientId: patient.id }
         });
+        socket_js_1.SocketService.sendToUser(req.user.userId, 'medicationRemindersUpdate', { id, deleted: true });
         res.json({ message: 'Lembrete excluído com sucesso' });
     }
     catch (error) {
@@ -1916,6 +2012,17 @@ router.post('/checkout', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIE
             catch (notifyErr) {
                 console.error('Erro ao notificar parceiro:', notifyErr);
             }
+            // Sincronização em Tempo Real via Socket.io
+            if (userId)
+                socket_js_1.SocketService.sendToUser(userId, 'appointmentUpdate', { appointmentId: appointment.id });
+            if (appointment.partnerId) {
+                const p = await prisma_js_1.default.partner.findUnique({
+                    where: { id: appointment.partnerId },
+                    select: { userId: true }
+                });
+                if (p?.userId)
+                    socket_js_1.SocketService.sendToUser(p.userId, 'appointmentUpdate', { appointmentId: appointment.id });
+            }
         }
         // 2. Registrar a Transação Financeira
         const transaction = await prisma_js_1.default.transaction.create({
@@ -1934,6 +2041,167 @@ router.post('/checkout', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIE
     }
     catch (error) {
         next(error);
+    }
+});
+// --- NOVO: Motor de Cotações Farmácia Pro 2.0 ---
+// Solicitar cotação de medicamento
+router.post('/pharmacy/quotations', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), upload.single('prescription'), async (req, res) => {
+    try {
+        const { medicamentName, quantity, description, lat, lng, maxDistanceKm } = req.body;
+        const userId = req.user?.userId;
+        const patient = await prisma_js_1.default.patient.findUnique({ where: { userId } });
+        if (!patient)
+            return res.status(404).json({ error: 'Paciente não encontrado' });
+        let imageUrl = null;
+        if (req.file) {
+            // Simulação de upload (em prod usaria o storageService)
+            imageUrl = `https://storage.docton.com.br/prescriptions/${Date.now()}-${req.file.originalname}`;
+        }
+        const quotation = await prisma_js_1.default.quotationRequest.create({
+            data: {
+                patientId: patient.id,
+                medicamentName,
+                quantity: parseInt(quantity) || 1,
+                description,
+                imageUrl,
+                lat: lat ? parseFloat(lat) : null,
+                lng: lng ? parseFloat(lng) : null,
+                maxDistanceKm: maxDistanceKm ? parseFloat(maxDistanceKm) : 10,
+                status: 'OPEN'
+            }
+        });
+        // Notificar farmácias próximas (Simulado: notifica todas por enquanto)
+        try {
+            const pharmacies = await prisma_js_1.default.pharmacy.findMany({
+                include: { users: true }
+            });
+            for (const pharmacy of pharmacies) {
+                for (const pharmacyUser of pharmacy.users) {
+                    await inAppNotification_service_js_1.default.createNotification({
+                        userId: pharmacyUser.id,
+                        type: 'SYSTEM',
+                        title: 'Nova Demanda de Medicamento!',
+                        message: `Um paciente solicitou cotação para: ${medicamentName}. Responda rápido para ganhar a venda!`,
+                        priority: 'high',
+                        link: '/pharmacy/dashboard'
+                    });
+                }
+            }
+        }
+        catch (notifErr) {
+            console.error('Erro ao notificar farmácias:', notifErr);
+        }
+        res.status(201).json({ success: true, quotation });
+    }
+    catch (error) {
+        console.error('Erro ao criar cotação:', error);
+        res.status(500).json({ error: 'Erro ao processar sua solicitação de cotação' });
+    }
+});
+// Listar minhas cotações de farmácia
+router.get('/pharmacy/quotations', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        const patient = await prisma_js_1.default.patient.findUnique({ where: { userId } });
+        if (!patient)
+            return res.status(404).json({ error: 'Paciente não encontrado' });
+        const quotations = await prisma_js_1.default.quotationRequest.findMany({
+            where: { patientId: patient.id },
+            include: {
+                responses: {
+                    include: {
+                        pharmacy: {
+                            select: {
+                                name: true,
+                                address: true,
+                                phone: true,
+                                users: { select: { avatar: true } }
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(quotations);
+    }
+    catch (error) {
+        console.error('Erro ao buscar cotações:', error);
+        res.status(500).json({ error: 'Erro ao listar suas cotações' });
+    }
+});
+// Aceitar Cotação / Simular Pagamento Farmácia Pro 2.0 (Fase 3)
+router.post('/pharmacy/quotations/:id/accept', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const { id } = req.params; // ID do QuotationResponse
+        const { addressId } = req.body;
+        const userId = req.user?.userId;
+        const patient = await prisma_js_1.default.patient.findUnique({ where: { userId } });
+        if (!patient)
+            return res.status(404).json({ error: 'Paciente não encontrado' });
+        // Buscar a resposta e a solicitação
+        const response = await prisma_js_1.default.quotationResponse.findUnique({
+            where: { id },
+            include: { quotation: true }
+        });
+        if (!response || response.quotation.patientId !== patient.id) {
+            return res.status(404).json({ error: 'Oferta não encontrada' });
+        }
+        // Atualiza a resposta para ACCEPTED
+        await prisma_js_1.default.quotationResponse.update({
+            where: { id },
+            data: { status: 'ACCEPTED' }
+        });
+        // Atualiza o Request principal para CLOSED
+        await prisma_js_1.default.quotationRequest.update({
+            where: { id: response.quotationId },
+            data: { status: 'CLOSED' }
+        });
+        // Notificar Farmácia da Venda/Entrega!
+        const pharmacyUsers = await prisma_js_1.default.user.findMany({
+            where: { pharmacy: { id: response.pharmacyId } }
+        });
+        for (const pharmacyUser of pharmacyUsers) {
+            await inAppNotification_service_js_1.default.createNotification({
+                userId: pharmacyUser.id,
+                type: 'SYSTEM',
+                title: 'Nova Venda Concluída! 💰',
+                message: `O paciente ${patient.userId} pagou o pedido de ${response.quotation.medicamentName}. Prepare o envio!`,
+                priority: 'high',
+                link: '/pharmacy/dashboard'
+            });
+        }
+        res.json({ success: true, message: 'Pagamento confirmado e pedido enviado para a farmácia!' });
+    }
+    catch (error) {
+        console.error('Erro ao processar pagamento:', error);
+        res.status(500).json({ error: 'Erro no pagamento in-app' });
+    }
+});
+// Listar Vitrines/Promoções da Região (Fase 3)
+router.get('/pharmacy/promotions', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT'), async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        // Opcional: poderíamos filtrar pelo Local do Paciente (geofencing real usando PostGIS)
+        // Para fins do MVP 2.0, buscaremos todas as ativas
+        const promotions = await prisma_js_1.default.pharmacyPromotion.findMany({
+            where: { isActive: true },
+            include: {
+                pharmacy: {
+                    select: { name: true, address: true, city: true }
+                }
+            },
+            orderBy: [
+                { isBoosted: 'desc' },
+                { createdAt: 'desc' }
+            ],
+            take: 20
+        });
+        res.json(promotions);
+    }
+    catch (error) {
+        console.error('Erro ao buscar vitrines:', error);
+        res.status(500).json({ error: 'Erro ao buscar promoções locais' });
     }
 });
 exports.default = router;

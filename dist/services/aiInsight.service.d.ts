@@ -15,10 +15,42 @@ export declare class AiInsightService {
      * MÉTODO PRINCIPAL: Gera insights personalizados para o paciente
      */
     generatePatientInsights(userId: string): Promise<AiInsight[]>;
+    /**
+     * Cria um insight manualmente
+     */
+    createInsight(data: {
+        userId?: string;
+        patientId?: string;
+        type: string;
+        title: string;
+        description?: string;
+        priority: string;
+        category: string;
+        actionable: boolean;
+        metadata?: any;
+    }): Promise<{
+        type: string;
+        description: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        priority: string;
+        category: string | null;
+        patientId: string;
+        metadata: string | null;
+        metadataJson: import("../../lib/generated/prisma/runtime/library").JsonValue | null;
+        actionable: boolean;
+        isRead: boolean;
+        isDismissed: boolean;
+    }>;
     private analyzeMentalHealth;
     private analyzePhysicalActivity;
     private analyzeMedicalAdherence;
     private generatePreventiveTips;
+    private analyzeAnamnesis;
+    private analyzeRecentExams;
+    private analyzeUpcomingAppointments;
     /**
      * FASE 4: Detecta padrões comportamentais correlacionando métricas
      */

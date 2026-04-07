@@ -204,17 +204,124 @@ class PatientService {
         };
     }
     /**
-     * Invalida o cache do dashboard para um usuário
+     * Obtém a timeline médica consolidada do paciente
      */
-    async invalidateDashboard(userId) {
-        const key = cache_service_js_1.CacheService.generateKey('PatientService', 'getDashboardData', { args: [userId] });
+    async getMedicalTimeline(userId) {
+        const user = await prisma_js_1.default.user.findUnique({
+            where: { id: userId },
+            include: {
+                person: { include: { patient: true } },
+                patient: true
+            }
+        });
+        const patient = user?.person?.patient ?? user?.patient ?? null;
+        if (!patient)
+            return [];
+        const patientId = patient.id;
+        // Fetch de todos os eventos clínicos
+        const [appointments, exams, histories, anamneses, prescriptions] = await Promise.all([
+            prisma_js_1.default.appointment.findMany({
+                where: { patientId },
+                include: { partner: { include: { user: { select: { name: true, avatar: true } } } } },
+                orderBy: { dateTime: 'desc' }
+            }),
+            prisma_js_1.default.healthExam.findMany({
+                where: { patientId },
+                orderBy: { date: 'desc' }
+            }),
+            prisma_js_1.default.medicalHistory.findMany({
+                where: { patientId },
+                orderBy: { date: 'desc' }
+            }),
+            prisma_js_1.default.anamnesis.findMany({
+                where: { patientId },
+                orderBy: { date: 'desc' }
+            }),
+            prisma_js_1.default.prescription.findMany({
+                where: { patientId },
+                include: { partner: { include: { user: { select: { name: true } } } } },
+                orderBy: { date: 'desc' }
+            })
+        ]);
+        // Normalização dos eventos
+        const timelineEvents = [
+            ...appointments.map(a => ({
+                id: a.id,
+                date: a.dateTime,
+                type: 'APPOINTMENT',
+                title: `Consulta com ${a.partner?.user?.name || 'Profissional'}`,
+                description: a.notes || 'Consulta realizada',
+                status: a.status,
+                category: a.partner?.specialty || 'Geral',
+                icon: 'Calendar',
+                partner: a.partner?.user?.name,
+                avatar: a.partner?.user?.avatar
+            })),
+            ...exams.map(e => ({
+                id: e.id,
+                date: e.date,
+                type: 'EXAM',
+                title: e.name,
+                description: `${e.type} - ${e.laboratory || 'Laboratório não informado'}`,
+                status: e.status,
+                category: e.type,
+                urgency: e.urgency,
+                icon: 'Activity',
+                attachments: e.attachments
+            })),
+            ...histories.map(h => ({
+                id: h.id,
+                date: h.date,
+                type: 'HISTORY',
+                title: `Registro Histórico: ${h.type}`,
+                description: h.description,
+                status: h.status,
+                category: h.specialty,
+                icon: 'FileText',
+                attachments: h.attachments
+            })),
+            ...anamneses.map(an => ({
+                id: an.id,
+                date: an.date,
+                type: 'ANAMNESIS',
+                title: 'Avaliação Clínica / Anamnese',
+                description: an.chiefComplaint,
+                status: 'Concluído',
+                category: an.specialty || 'Clínica Médica',
+                icon: 'Stethoscope',
+                attachments: an.attachments,
+                doctor: an.doctorName
+            })),
+            ...prescriptions.map(p => ({
+                id: p.id,
+                date: p.date,
+                type: 'PRESCRIPTION',
+                title: 'Nova Prescrição Médica',
+                description: p.medication || 'Medicação prescrita',
+                status: p.status,
+                category: 'Medicação',
+                icon: 'Pill',
+                attachments: p.attachments,
+                doctor: p.partner?.user?.name || p.doctor
+            }))
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return timelineEvents;
+    }
+    /**
+     * Invalida o cache da timeline para um usuário
+     */
+    async invalidateTimeline(userId) {
+        const key = cache_service_js_1.CacheService.generateKey('PatientService', 'getMedicalTimeline', { args: [userId] });
         await cache_service_js_1.cacheService.delete(key);
-        logger_js_1.logger.info(`[PatientService] Cache invalidated for user ${userId}`);
+        logger_js_1.logger.info(`[PatientService] Timeline cache invalidated for user ${userId}`);
     }
 }
 exports.PatientService = PatientService;
 __decorate([
     (0, cache_service_js_1.Cacheable)({ ttl: 300, tags: ['patient', 'dashboard'] })
 ], PatientService.prototype, "getDashboardData", null);
+__decorate([
+    (0, cache_service_js_1.Cacheable)({ ttl: 60, tags: ['patient', 'timeline'] })
+], PatientService.prototype, "getMedicalTimeline", null);
 exports.patientService = new PatientService();
 //# sourceMappingURL=patient.service.js.map

@@ -6,12 +6,12 @@ export const MedicalHistorySchema = z.object({
     doctor: z.string().min(1, 'Médico é obrigatório'),
     specialty: z.string().min(1, 'Especialidade é obrigatória'),
     description: z.string().min(1, 'Descrição é obrigatória'),
-    diagnosis: z.string().optional(),
-    treatment: z.string().optional(),
-    location: z.string().optional(),
+    diagnosis: z.string().optional().nullable().or(z.literal('')),
+    treatment: z.string().optional().nullable().or(z.literal('')),
+    location: z.string().optional().nullable().or(z.literal('')),
     status: z.string().default('Concluído'),
-    notes: z.string().optional(),
-    attachments: z.array(z.string()).optional(),
+    notes: z.string().optional().nullable().or(z.literal('')),
+    attachments: z.array(z.string()).optional().default([]),
 });
 
 export const AnamnesisSchema = z.object({
