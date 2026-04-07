@@ -2937,14 +2937,33 @@ router.post('/reputation/reviews/:reviewId/reply', authenticate, authorize('PART
 });
 
 // --- PRESCRIÇÕES & RECEITAS ---
-router.get('/prescriptions', authenticate, authorize('PARTNER'), async (req, res) => {
+router.get('/prescriptions', authenticate, authorize('PARTNER', 'PHARMACY'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({
-      where: { userId }
-    });
+    const role = req.user?.role;
+    
+    let partnerId = '';
 
-    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+    if (role === 'PARTNER') {
+        const partner = await prisma.partner.findUnique({
+            where: { userId }
+        });
+        if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+        partnerId = partner.id;
+    } else {
+        // Se for Farmácia, por enquanto simulamos buscando as prescrições mais recentes do sistema
+        // No futuro, filtraríamos por prescrições enviadas para esta farmácia específica
+        const pharmacy = await prisma.pharmacy.findUnique({
+            where: { userId }
+        });
+        if (!pharmacy) return res.status(404).json({ error: 'Farmácia não encontrada' });
+        
+        // Retorna todas as prescrições (Mock de Histórico Geral para Farmácia)
+        const prescriptions = await prescriptionService.getPrescriptionsByPartner(''); // Vazio busca geral ou mock
+        return res.json(prescriptions);
+    }
+
+    const prescriptions = await prescriptionService.getPrescriptionsByPartner(partnerId);
 
     const prescriptions = await prescriptionService.getPrescriptionsByPartner(partner.id);
     res.json(prescriptions);
