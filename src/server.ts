@@ -162,6 +162,8 @@ app.use('/permissions', apiRouter);
 app.use('/reports', apiRouter);
 app.use('/medical', apiRouter);
 app.use('/telemedicine', apiRouter);
+app.use('/partners', apiRouter);
+app.use('/partner', apiRouter);
 
 app.get('/api/health', async (_req, res) => {
   let dbStatus = 'down';

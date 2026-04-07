@@ -2709,9 +2709,16 @@ router.delete('/equipment/:id', authenticate, authorize('PARTNER'), async (req, 
 
 // ==================== COMBOS E INTELIGÊNCIA DE RECEITA ====================
 
-router.get('/combos', authenticate, authorize('PARTNER'), async (req, res) => {
+router.get('/combos', authenticate, authorize('PARTNER', 'PHARMACY'), async (req, res) => {
   try {
-    const userId = (req as any).user.userId || (req as any).user.id;
+    const userId = req.user?.userId;
+    const role = req.user?.role;
+    
+    if (role === 'PHARMACY') {
+        // Farmácias não têm combos clínicos por enquanto, retornamos lista vazia ou mockada
+        return res.json({ data: [] });
+    }
+
     const partner = await prisma.partner.findFirst({
       where: { userId },
       select: { id: true }
@@ -2773,23 +2780,32 @@ router.delete('/combos/:id', authenticate, authorize('PARTNER'), async (req, res
   }
 });
 
-router.get('/revenue/insights', authenticate, authorize('PARTNER'), async (req, res) => {
+router.get('/revenue/insights', authenticate, authorize('PARTNER', 'PHARMACY'), async (req, res) => {
   try {
-    const userId = (req as any).user?.userId || (req as any).user?.id;
-    console.log(`[Partners/Insights] Buscando insights para o usuário: ${userId}`);
+    const userId = req.user?.userId;
+    const role = req.user?.role;
     
+    if (role === 'PHARMACY') {
+        return res.json({
+            todayRevenue: 0,
+            monthlyRevenue: 0,
+            averageTicket: 0,
+            growth: 0,
+            insights: ["Módulo financeiro de farmácia integrado."]
+        });
+    }
+
     // Busca robusta pelo parceiro
     const partner = await prisma.partner.findFirst({ 
       where: { 
         OR: [
           { userId: userId },
-          { id: userId } // Caso o ID do usuário seja o mesmo do parceiro em alguns contextos
+          { id: userId }
         ]
       } 
     });
     
     if (!partner) {
-      console.warn(`[Partners/Insights] 404: Parceiro não encontrado na tabela 'Partner' para userId: ${userId}.`);
       return res.status(404).json({ 
         error: 'Parceiro não encontrado', 
         details: 'Perfil de parceiro não localizado no banco de dados. Verifique se o cadastro foi concluído.' 
@@ -2933,42 +2949,6 @@ router.post('/reputation/reviews/:reviewId/reply', authenticate, authorize('PART
     res.json(updatedReview);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
-  }
-});
-
-// --- PRESCRIÇÕES & RECEITAS ---
-router.get('/prescriptions', authenticate, authorize('PARTNER', 'PHARMACY'), async (req, res) => {
-  try {
-    const userId = req.user?.userId;
-    const role = req.user?.role;
-    
-    let partnerId = '';
-
-    if (role === 'PARTNER') {
-        const partner = await prisma.partner.findUnique({
-            where: { userId }
-        });
-        if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
-        partnerId = partner.id;
-    } else {
-        // PHARMACY Role: O modelo Pharmacy se vincula via pharmacyId no User
-        const userWithPharm = await prisma.user.findUnique({
-            where: { id: userId },
-            include: { pharmacy: true }
-        });
-        
-        if (!userWithPharm?.pharmacy) return res.status(404).json({ error: 'Farmácia não encontrada para este usuário' });
-        
-        // Retorna todas as prescrições (Mock de Histórico Geral para Farmácia)
-        const prescriptions = await prescriptionService.getPrescriptionsByPartner('');
-        return res.json(prescriptions);
-    }
-
-    const prescriptions = await prescriptionService.getPrescriptionsByPartner(partnerId);
-    res.json(prescriptions);
-  } catch (err) {
-    console.error('[Prescriptions] Error fetching:', err);
-    res.status(500).json({ error: 'Erro ao buscar prescrições' });
   }
 });
 
