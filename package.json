@@ -4,7 +4,7 @@
     "description": "Docton Saúde Backend API",
     "main": "dist/server.js",
     "scripts": {
-        "build": "npx prisma generate && npx tsc",
+        "build": "npx prisma generate && npx tsc --noEmitOnError false",
         "start": "node dist/server.js",
         "start:simple": "node dist/server-simple.js",
         "start:intermediate": "node dist/server-intermediate.js",

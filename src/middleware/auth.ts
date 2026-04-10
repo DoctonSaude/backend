@@ -21,6 +21,7 @@ declare global {
         role: string;
         email?: string;
         personId?: string;
+        tenantId?: string;
       };
     }
   }
@@ -99,7 +100,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         userId: user.id,
         role: user.role,
         email: user.email,
-        personId: user.personId || undefined
+        personId: user.personId || undefined,
+        tenantId: user.tenantId || undefined
       };
 
       logger.debug('[auth] user authenticated', { userId: user.id, role: user.role });

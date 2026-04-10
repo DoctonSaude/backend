@@ -15,8 +15,15 @@ export const app = express();
 // Trust proxy para Railway/produção (necessário para rate-limit com X-Forwarded-For)
 app.set('trust proxy', 1);
 
-// A saúde mais rápida possível, sem dependências
-app.get('/api/ping', (req, res) => res.status(200).send('PONG'));
+// Endpoint de Diagnóstico de Choque (Reality Check)
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    version: 'v-reality-check-99',
+    deployed_at: new Date().toISOString(),
+    message: 'Se você está vendo isso, o deploy FUNCIONOU!'
+  });
+});
 
 import cors from 'cors';
 import { env } from './config/env.js';
@@ -60,6 +67,8 @@ import { logger } from './lib/logger.js';
 import { registerPharmacyConnector } from './connectors/pharmacy.connector.js';
 import { registerB2BConnector } from './connectors/b2b.connector.js';
 import { registerIntelligenceConnector } from './connectors/intelligence.connector.js';
+import pharmacyRoutes from './routes/pharmacy.routes.js';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { ChurnPreventionJobs } from './jobs/churn-prevention.job.js';
 import { NPSAnalysisJobs } from './jobs/nps-analysis.job.js';
 
@@ -74,6 +83,7 @@ import { startAllCronJobs as startWeeklyJobs } from './jobs/weekly-email.job.js'
 import { startHealthJourneyJob } from './jobs/health-journey.job.js';
 import { FinanceJob } from './jobs/finance.job.js';
 import prisma from './lib/prisma.js';
+import { performanceLogger } from './middleware/logger.middleware.js';
 
 const httpServer = createServer(app);
 
@@ -145,14 +155,31 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 app.use(hpp());
 
+// --- Gateway Integrado (Hybrid Routing) ---
+// --- Gateway Integrado (Hybrid Routing) ---
+// Redireciona chamadas de busca pública para o serviço Next.js (Porta 3002)
+app.use([
+  '/api/pharmacy/nearby',
+  '/api/pharmacy/search',
+  '/api/pharmacy/product-search'
+], createProxyMiddleware({
+  target: process.env.PHARMACY_SERVICE_URL || 'http://localhost:3002',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/pharmacy': '/api/pharmacies' // Mapeia para o plural esperado pelo Next.js
+  },
+  logLevel: 'debug'
+}));
+
+// Registro local das rotas de Farmácia (Gestão/Marketing)
+// Deve vir DEPOIS do proxy para não capturar as rotas de busca
+app.use('/api/pharmacy', pharmacyRoutes);
+
 // 4. i18n Middleware
 app.use(i18nMiddleware.handle(i18next));
 
-import { performanceLogger } from './middleware/logger.middleware.js';
-
-// ... (mais abaixo no arquivo onde os middlewares são registrados)
+// 5. Performance Logger
 app.use(performanceLogger);
-// ...
 
 // 6. API Routes
 app.use('/api', apiRouter);
@@ -183,7 +210,25 @@ app.get('/api/health', async (_req, res) => {
   });
 });
 
+// --- Diagnóstico Global ---
+app.use((req, res, next) => {
+  res.setHeader('X-Express-Server', 'active-v3-nuclear');
+  next();
+});
+
 app.use(errorHandler);
+
+// Handler 404 Personalizado para Diagnóstico Nuclear
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found in Express Backend',
+    message: 'Esta rota não existe no servidor Express.',
+    path: req.path,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+    backend_version: 'v3-nuclear'
+  });
+});
 
 let server: any;
 

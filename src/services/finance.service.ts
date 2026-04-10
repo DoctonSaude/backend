@@ -3,14 +3,23 @@ import { addDays } from 'date-fns';
 
 export class FinanceService {
   /**
-   * Calcula as taxas e o valor líquido do parceiro com base no plano.
-   * FREE: 15% | PRO: 10% | PREMIUM: 5%
+   * Calcula as taxas e o valor líquido do parceiro.
+   * Prioridade: Taxa customizada nos Dados Financeiros > Plano (PREMIUM 5%, PRO 10%, FREE 15%)
    */
-  calculateFees(amount: number, planTier: string = 'FREE') {
+  async calculateFees(amount: number, partnerId: string, planTier: string = 'FREE') {
     let commissionPercent = 15;
     
-    if (planTier === 'PRO') commissionPercent = 10;
-    if (planTier === 'PREMIUM') commissionPercent = 5;
+    // Buscar se há taxa customizada configurada nos dados financeiros
+    const financialData = await prisma.partnerFinancialData.findUnique({
+      where: { partnerId }
+    });
+
+    if (financialData && financialData.platformFeePercentage !== undefined) {
+      commissionPercent = financialData.platformFeePercentage;
+    } else {
+      if (planTier === 'PRO') commissionPercent = 10;
+      if (planTier === 'PREMIUM') commissionPercent = 5;
+    }
 
     const doctonFee = (amount * commissionPercent) / 100;
     const partnerNetPrice = amount - doctonFee;
@@ -24,39 +33,53 @@ export class FinanceService {
 
   /**
    * Registra a conclusão de um agendamento e atualiza o financeiro do parceiro.
-   * Implementa liquidação D+1 por padrão.
+   * Agora busca o preço dinamicamente do serviço vinculado.
    */
   async processAppointmentCompletion(appointmentId: string) {
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
       include: { 
         partner: true,
-        patient: { include: { user: true } }
+        patient: { include: { user: true } },
+        service: true
       }
     });
 
-    if (!appointment || !appointment.partner) {
+    if (!appointment || !appointment.partnerId || !appointment.partner) {
       throw new Error('Agendamento ou Parceiro não encontrado');
     }
 
-    // Se o agendamento não tem preço (ex: consulta gratuita), não gera transação financeira
-    // Para simplificar, assumiremos que o preço vem do serviço associado (a implementar se necessário)
-    // Usaremos um valor base ou buscaremos do serviço se disponível.
-    // TODO: Integrar com preço real do serviço
-    const basePrice = 100; // Mock de preço enquanto não temos checkout integrado
-
-    const fees = this.calculateFees(basePrice, appointment.partner.planTier);
+    // 1. Obter o preço base dinamicamente
+    let basePrice = 0;
     
-    // Determinar janela de liquidação com base no plano
-    let daysToClear = 30; // FREE recebe em 30 dias
-    if (appointment.partner.planTier === 'STARTER' || appointment.partner.planTier === 'BASIC') daysToClear = 15;
-    if (appointment.partner.planTier === 'PRO') daysToClear = 7;
-    if (appointment.partner.planTier === 'PREMIUM') daysToClear = 1;
+    if (appointment.serviceId && appointment.service) {
+      basePrice = appointment.service.price;
+    } else {
+      // Fallback para notas estruturadas (Retrocompatibilidade)
+      const notesPriceMatch = appointment.notes?.match(/Valor:\s*(\d+(\.\d+)?)/);
+      if (notesPriceMatch) {
+        basePrice = parseFloat(notesPriceMatch[1]);
+      } else {
+        // Fallback final: preço padrão do parceiro ou valor fixo
+        basePrice = appointment.partner.consultationPrice || 100;
+      }
+    }
 
-    // Data de liquidação customizada
+    // Se o preço for zero (ex: retorno ou cortesia), não gera transação financeira
+    if (basePrice <= 0) return null;
+
+    const fees = await this.calculateFees(basePrice, appointment.partnerId, appointment.partner.planTier);
+    
+    // 2. Determinar janela de liquidação com base no plano
+    let daysToClear = 30;
+    const tier = appointment.partner.planTier;
+    if (tier === 'STARTER' || tier === 'BASIC') daysToClear = 15;
+    if (tier === 'PRO') daysToClear = 7;
+    if (tier === 'PREMIUM') daysToClear = 1;
+
     const availableAt = addDays(new Date(), daysToClear);
 
-    // 1. Atualizar Agendamento
+    // 3. Atualizar Agendamento com os valores calculados
     await prisma.appointment.update({
       where: { id: appointmentId },
       data: {
@@ -68,24 +91,26 @@ export class FinanceService {
       }
     });
 
-    // 2. Criar Transação na Carteira (Crédito Pendente)
+    // 4. Criar Transação na Carteira
+    const serviceName = appointment.service?.name || appointment.notes?.split('\n')[0] || 'Atendimento';
+    
     await prisma.partnerTransaction.create({
       data: {
-        partnerId: appointment.partnerId!,
+        partnerId: appointment.partnerId,
         appointmentId: appointment.id,
         type: 'CREDIT',
         amount: fees.partnerNetPrice,
-        description: `Atendimento: ${appointment.patient.user?.name || 'Paciente'}`,
+        description: `${serviceName}: ${appointment.patient.user?.name || 'Paciente'}`,
         status: 'PENDING',
         availableAt
       }
     });
 
-    // 3. Atualizar Saldo Pendente da Carteira
+    // 5. Atualizar Saldo Pendente na Carteira
     await prisma.partnerWallet.upsert({
-      where: { partnerId: appointment.partnerId! },
+      where: { partnerId: appointment.partnerId },
       create: {
-        partnerId: appointment.partnerId!,
+        partnerId: appointment.partnerId,
         pendingBalance: fees.partnerNetPrice,
         balance: 0
       },

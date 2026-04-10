@@ -1,13 +1,12 @@
 generator client {
   provider      = "prisma-client-js"
-  output        = "../lib/generated/prisma"
+  output        = "../backend/lib/generated/prisma"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Tenant {
@@ -160,16 +159,12 @@ model Partner {
   languages                String[]                  @default([])
   settings                 Json?
   workingHours             Json?
-  planTier                 String                    @default("FREE")
-  planStatus               String                    @default("ACTIVE")
-  planExpiresAt            DateTime?
-  happyHourConfig          Json?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   installations            AppInstallation[]
   appointments             Appointment[]
-  combos                   ServiceCombo[]
   availabilityRequests     AvailabilityRequest[]
+  clinicMaterials          ClinicMaterial[]
   equipment                Equipment[]
   favorites                FavoritePartner[]
   medicalQuotes            MedicalQuote[]
@@ -180,9 +175,6 @@ model Partner {
   user                     User?                     @relation("UserToPartner", fields: [userId], references: [id], onDelete: Cascade)
   documents                PartnerDocument[]
   financialData            PartnerFinancialData?
-  wallet                   PartnerWallet?
-  partnerTransactions      PartnerTransaction[]
-  payoutRequests           PayoutRequest[]
   services                 PartnerService[]
   Prescription             Prescription[]
   quotes                   Quote[]
@@ -244,8 +236,6 @@ model Patient {
   totalChallengesCompleted Int                       @default(0)
   userIntent               String?
   userPriority             String?
-  familyGroupId            String?
-  familyRole               String?                   @default("HEAD")
   achievementShares        AchievementShare[]
   anamneses                Anamnesis[]
   appointments             Appointment[]
@@ -258,11 +248,8 @@ model Patient {
   medicalQuotes            MedicalQuote[]
   medicalRecords           MedicalRecord[]
   medicalRecordPermissions MedicalRecordPermission[] @relation("PatientToPermission")
-  medicationLogs           MedicationLog[]
   medicationReminders      MedicationReminder[]
-  medicationSubscriptions  MedicationSubscription[]
   nftCertificates          NFTCertificate[]
-  familyGroup              FamilyGroup?              @relation(fields: [familyGroupId], references: [id])
   person                   Person?                   @relation(fields: [personId], references: [id], onDelete: Cascade)
   tenant                   Tenant?                   @relation(fields: [tenantId], references: [id])
   user                     User?                     @relation("UserToPatient", fields: [userId], references: [id], onDelete: Cascade)
@@ -272,62 +259,44 @@ model Patient {
   patientGoals             PatientGoal[]
   insights                 PatientInsight[]
   patientRewards           PatientReward[]
-  pharmacyCustomers        PharmacyCustomer[]
   pharmacyOrders           PharmacyOrder[]
   pointsHistory            PointsHistory[]
   prescriptions            Prescription[]
-  quotationRequests        QuotationRequest[]
   quotes                   Quote[]
   researchEnrollments      ResearchEnrollment[]
   reviews                  Review[]
   subscriptions            Subscription[]
   supportTickets           SupportTicket[]
-  symptomAnalyses          SymptomAnalysis[]
   transactions             Transaction[]
   validationLogs           ValidationCodeLog[]
   wearableConnections      WearableConnection[]
   xpTransactions           XPTransaction[]
 }
 
-model FamilyGroup {
-  id        String    @id @default(cuid())
-  name      String
-  ownerId   String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  members   Patient[]
-}
-
 model Appointment {
-  id                String              @id @default(cuid())
-  patientId         String
-  partnerId         String?
-  dateTime          DateTime?
-  duration          Int?
-  status            String              @default("SCHEDULED")
-  isOnline          Boolean             @default(false)
-  meetingLink       String?
-  notes             String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  roomId            String?
-  equipmentId       String?
-  professionalId    String?
-  doctonFee         Float?
-  partnerNetPrice   Float?
-  commissionPercent Float?
-  availableAt       DateTime?
-  payoutStatus      String?             @default("PENDING")
-  equipment         Equipment?          @relation(fields: [equipmentId], references: [id])
-  partner           Partner?            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  patient           Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  professional      TeamMember?         @relation(fields: [professionalId], references: [id])
-  room              Room?               @relation(fields: [roomId], references: [id])
-  medicalRecord     MedicalRecord?
-  pixDeposit        PixDeposit?
-  review            Review?
-  validationLogs    ValidationCodeLog[]
-  prescriptions     Prescription[]
+  id             String              @id @default(cuid())
+  patientId      String
+  partnerId      String?
+  dateTime       DateTime?
+  duration       Int?
+  status         String              @default("SCHEDULED")
+  isOnline       Boolean             @default(false)
+  meetingLink    String?
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  roomId         String?
+  equipmentId    String?
+  professionalId String?
+  equipment      Equipment?          @relation(fields: [equipmentId], references: [id])
+  partner        Partner?            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  patient        Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional   TeamMember?         @relation(fields: [professionalId], references: [id])
+  room           Room?               @relation(fields: [roomId], references: [id])
+  medicalRecord  MedicalRecord?
+  pixDeposit     PixDeposit?
+  review         Review?
+  validationLogs ValidationCodeLog[]
 
   @@index([patientId])
   @@index([partnerId])
@@ -410,12 +379,6 @@ model Prescription {
   reminders         MedicationReminder[]
   partner           Partner?             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   patient           Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  appointment       Appointment?         @relation(fields: [appointmentId], references: [id])
-  appointmentId     String?
-  content           String?              @db.Text
-  signature         String?
-  signedAt          DateTime?
-  isDigital         Boolean              @default(true)
 }
 
 model MedicationReminder {
@@ -438,22 +401,6 @@ model MedicationReminder {
   prescription   Prescription? @relation(fields: [prescriptionId], references: [id])
 }
 
-model MedicationLog {
-  id             String    @id @default(cuid())
-  patientId      String
-  medicationName String
-  dosage         String
-  scheduledTime  DateTime
-  takenTime      DateTime?
-  status         String    @default("taken")
-  notes          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, scheduledTime])
-}
-
 model Review {
   id            String      @id @default(cuid())
   appointmentId String      @unique
@@ -468,17 +415,6 @@ model Review {
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   partner       Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   patient       Patient?    @relation(fields: [patientId], references: [id])
-}
-
-model SymptomAnalysis {
-  id        String   @id @default(cuid())
-  patientId String
-  symptoms  Json
-  result    Json
-  createdAt DateTime @default(now())
-  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([patientId])
 }
 
 model SupportTicket {
@@ -634,24 +570,10 @@ model PartnerService {
   doctonFeePercent   Float?
   partnerPayout      Float?
   serviceCategoryId  String?
+  prepInstructions   String?
+  minPrepHours       Int?             @default(0)
   partner            Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   serviceCategory    ServiceCategory? @relation(fields: [serviceCategoryId], references: [id])
-  combos             ServiceCombo[]
-
-  @@index([partnerId])
-}
-
-model ServiceCombo {
-  id          String           @id @default(cuid())
-  partnerId   String
-  name        String
-  description String?
-  price       Float
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  partner     Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  services    PartnerService[]
 
   @@index([partnerId])
 }
@@ -1197,6 +1119,8 @@ model HealthTip {
   imageUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("health_tips")
 }
 
 model InspirationalQuote {
@@ -1223,15 +1147,30 @@ model Room {
 }
 
 model Equipment {
-  id           String        @id @default(cuid())
-  name         String
-  partnerId    String
-  status       String        @default("AVAILABLE")
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  appointments Appointment[]
-  partner      Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  id                   String        @id @default(cuid())
+  name                 String
+  partnerId            String
+  status               String        @default("AVAILABLE")
+  isActive             Boolean       @default(true)
+  useCount             Int           @default(0)
+  maintenanceThreshold Int           @default(100)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  appointments         Appointment[]
+  partner              Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+}
+
+model ClinicMaterial {
+  id        String   @id @default(cuid())
+  partnerId String
+  name      String
+  stock     Float    @default(0)
+  minStock  Float    @default(10)
+  unit      String   @default("un")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 }
 
 model AppInstallation {
@@ -1334,118 +1273,23 @@ model Company {
 }
 
 model Pharmacy {
-  id                         String                        @id @default(cuid())
-  tenantId                   String?
-  name                       String
-  address                    String?
-  cnpj                       String?
-  isApproved                 Boolean                       @default(false)
-  createdAt                  DateTime                      @default(now())
-  updatedAt                  DateTime                      @updatedAt
-  acceptedPayments           String[]                      @default(["PIX", "CREDIT_CARD", "CASH"])
-  averagePriceVsMarket       Float                         @default(1.0)
-  averageResponseTimeMinutes Float                         @default(0)
-  city                       String?
-  commissionPercent          Float                         @default(10.0)
-  deliveryFee                Float?
-  deliveryMinOrder           Float?                        @default(0)
-  deliveryRadius             Float?
-  deliveryTimeAvg            Int?
-  distanceScore              Float                         @default(0)
-  email                      String?
-  hasDelivery                Boolean                       @default(false)
-  isActive                   Boolean                       @default(true)
-  lat                        Float?
-  lng                        Float?
-  openingHours               String?
-  performanceScore           Float                         @default(0)
-  phone                      String?
-  planScore                  Float                         @default(0)
-  priceCompetitivenessScore  Float                         @default(0)
-  reasonSocial               String?
-  responseRateScore          Float                         @default(0)
-  responseTimeScore          Float                         @default(0)
-  scoreUpdatedAt             DateTime?
-  state                      String?
-  totalQuotesReceived        Int                           @default(0)
-  totalQuotesResponded       Int                           @default(0)
-  whatsapp                   String?
-  medicationSubscriptions    MedicationSubscription[]
-  tenant                     Tenant?                       @relation(fields: [tenantId], references: [id])
-  customers                  PharmacyCustomer[]
-  metrics                    PharmacyMetric[]
-  orders                     PharmacyOrder[]
-  performanceSnapshots       PharmacyPerformanceSnapshot[]
-  products                   PharmacyProduct[]
-  promotions                 PharmacyPromotion[]
-  quotationResponses         QuotationResponse[]
-  users                      User[]
+  id       String          @id @default(cuid())
+  tenantId String?
+  name     String
+  address  String?
+  tenant   Tenant?         @relation(fields: [tenantId], references: [id])
+  orders   PharmacyOrder[]
+  users    User[]
 }
 
 model PharmacyOrder {
-  id               String              @id @default(cuid())
-  patientId        String
-  pharmacyId       String
-  status           String              @default("RECEIVED")
-  createdAt        DateTime            @default(now())
-  commissionAmount Float               @default(0)
-  deliveryAddress  String?
-  deliveryFee      Float               @default(0)
-  paymentMethod    String?
-  total            Float               @default(0)
-  updatedAt        DateTime            @updatedAt
-  patient          Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  pharmacy         Pharmacy            @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  items            PharmacyOrderItem[]
-}
-
-model PharmacyOrderItem {
-  id        String          @id @default(cuid())
-  orderId   String
-  productId String
-  quantity  Int             @default(1)
-  price     Float
-  order     PharmacyOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   PharmacyProduct @relation(fields: [productId], references: [id])
-}
-
-model PharmacyProduct {
-  id             String              @id @default(cuid())
-  pharmacyId     String
-  name           String
-  category       String
-  brand          String?
-  lab            String?
-  barcode        String?
-  sku            String?
-  description    String?
-  price          Float
-  promotionPrice Float?
-  stock          Int                 @default(0)
-  stockMin       Int                 @default(0)
-  validity       DateTime?
-  batch          String?
-  isActive       Boolean             @default(true)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  orderItems     PharmacyOrderItem[]
-  pharmacy       Pharmacy            @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-}
-
-model PharmacyCustomer {
-  id         String    @id @default(cuid())
-  pharmacyId String
+  id         String   @id @default(cuid())
   patientId  String
-  orderCount Int       @default(0)
-  totalSpent Float     @default(0)
-  isVIP      Boolean   @default(false)
-  lastOrder  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  patient    Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  pharmacy   Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-
-  @@unique([pharmacyId, patientId])
+  pharmacyId String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
 }
 
 model BlockchainRecord {
@@ -1455,30 +1299,6 @@ model BlockchainRecord {
   dataHash  String
   createdAt DateTime @default(now())
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-}
-
-model MedicationSubscription {
-  id              String    @id @default(cuid())
-  patientId       String
-  pharmacyId      String?
-  medicationName  String
-  dosage          String?
-  quantity        Int       @default(1)
-  frequencyDays   Int       @default(30)
-  nextRefillDate  DateTime
-  status          String    @default("ACTIVE")
-  discountPercent Float     @default(10.0)
-  autoRefill      Boolean   @default(true)
-  paymentMethod   String?
-  lastRefillDate  DateTime?
-  totalRefills    Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  pharmacy        Pharmacy? @relation(fields: [pharmacyId], references: [id])
-
-  @@index([patientId])
-  @@index([nextRefillDate])
 }
 
 model NFTCertificate {
@@ -1818,120 +1638,4 @@ model UserProductStats {
 
   @@index([userId])
   @@index([isRecurring])
-}
-
-model QuotationRequest {
-  id             String              @id @default(cuid())
-  patientId      String
-  medicamentName String
-  quantity       Int                 @default(1)
-  description    String?
-  imageUrl       String?
-  status         String              @default("OPEN")
-  lat            Float?
-  lng            Float?
-  maxDistanceKm  Float?              @default(10)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  patient        Patient             @relation(fields: [patientId], references: [id])
-  responses      QuotationResponse[]
-}
-
-model QuotationResponse {
-  id              String           @id @default(cuid())
-  quotationId     String
-  pharmacyId      String
-  price           Float
-  isAvailable     Boolean          @default(true)
-  deliveryTimeMin Int?
-  observations    String?
-  status          String           @default("PENDING")
-  responseTimeSec Int?
-  createdAt       DateTime         @default(now())
-  pharmacy        Pharmacy         @relation(fields: [pharmacyId], references: [id])
-  quotation       QuotationRequest @relation(fields: [quotationId], references: [id])
-}
-
-model PharmacyPromotion {
-  id             String   @id @default(cuid())
-  pharmacyId     String
-  title          String
-  description    String?
-  originalPrice  Float?
-  promotionPrice Float
-  imageUrl       String?
-  startDate      DateTime
-  endDate        DateTime
-  isBoosted      Boolean  @default(false)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  pharmacy       Pharmacy @relation(fields: [pharmacyId], references: [id])
-}
-
-model PharmacyMetric {
-  id         String   @id @default(cuid())
-  pharmacyId String
-  type       String
-  value      Float
-  metadata   Json?
-  date       DateTime @default(now())
-  createdAt  DateTime @default(now())
-  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id])
-}
-
-model PharmacyPerformanceSnapshot {
-  id                         String   @id @default(cuid())
-  pharmacyId                 String
-  responseTimeScore          Float    @default(0)
-  responseRateScore          Float    @default(0)
-  priceCompetitivenessScore  Float    @default(0)
-  distanceScore              Float    @default(0)
-  planScore                  Float    @default(0)
-  overallScore               Float    @default(0)
-  totalQuotesReceived        Int      @default(0)
-  totalQuotesResponded       Int      @default(0)
-  averageResponseTimeMinutes Float    @default(0)
-  averagePriceVsMarket       Float    @default(1.0)
-  regionalAveragePrice       Float    @default(0)
-  competitorCount            Int      @default(0)
-  marketShare                Float    @default(0)
-  date                       DateTime @default(now())
-  createdAt                  DateTime @default(now())
-  pharmacy                   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-
-  @@index([pharmacyId])
-  @@index([date])
-}
-
-model PartnerWallet {
-  id             String   @id @default(cuid())
-  partnerId      String   @unique
-  balance        Float    @default(0)
-  pendingBalance Float    @default(0)
-  updatedAt      DateTime @updatedAt
-  partner        Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-}
-
-model PartnerTransaction {
-  id            String    @id @default(cuid())
-  partnerId     String
-  appointmentId String?
-  type          String // CREDIT, DEBIT
-  amount        Float
-  description   String?
-  status        String    @default("PENDING")
-  availableAt   DateTime?
-  createdAt     DateTime  @default(now())
-  partner       Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-}
-
-model PayoutRequest {
-  id          String    @id @default(cuid())
-  partnerId   String
-  amount      Float
-  status      String    @default("PENDING")
-  bankDetails Json?
-  processedAt DateTime?
-  createdAt   DateTime  @default(now())
-  partner     Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 }

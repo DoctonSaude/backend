@@ -59,6 +59,15 @@ const GATEWAY_CONFIG = {
         errorThresholdPercentage: 25,
         resetTimeout: 45000
       }
+    },
+    monolith: {
+      url: process.env.BACKEND_URL || 'http://localhost:3001',
+      timeout: 10000,
+      circuitBreaker: {
+        timeout: 8000,
+        errorThresholdPercentage: 30,
+        resetTimeout: 60000
+      }
     }
   }
 }
@@ -256,12 +265,24 @@ class APIGateway {
   }
 
   private setupServiceRoutes(): void {
-    // Pharmacy service routes
+    // --- Módulo Farmácia (Híbrido) ---
+    // 1. Busca e Público (Next.js - Porta 3002)
+    // Estas rotas têm prioridade e são desviadas para o serviço Next.js
     this.app.use('/api/pharmacy', this.createServiceProxy('pharmacy', [
       'GET /nearby',
       'GET /:id/performance',
       'POST /quote',
       'GET /search'
+    ]))
+
+    // 2. Gestão e Operações (Monolito - Porta 3001)
+    // Agindo como fallback: QUALQUER outra rota enviada para /api/pharmacy vai para o Monolito
+    this.app.use('/api/pharmacy', this.createServiceProxy('monolith', [
+      'GET *',
+      'POST *',
+      'PUT *',
+      'DELETE *',
+      'PATCH *'
     ]))
 
     // Payments service routes
@@ -295,8 +316,24 @@ class APIGateway {
       target: config.url,
       changeOrigin: true,
       timeout: config.timeout,
-      pathRewrite: {
-        [`^/api/${serviceName}`]: '/api'
+      pathRewrite: (path) => {
+        // Regra para o Monolito (Gestão/Operações)
+        if (serviceName === 'monolith') {
+          // O Express/HPM remove o mount point (/api/pharmacy). 
+          // Precisamos re-adicionar para o monolito reconhecer nas rotas internas.
+          return `/api/pharmacy${path}`;
+        }
+        
+        // Regra para o Next.js (Público/Histórico)
+        if (serviceName === 'pharmacy') {
+          // O Next.js usa plural (/api/pharmacies) para rotas legadas
+          if (path.startsWith('/nearby')) return `/api/pharmacies${path}`;
+          if (path.startsWith('/search')) return `/api/pharmacies${path}`;
+          return `/api/pharmacies${path}`;
+        }
+
+        // Padrão para outros microserviços
+        return path.replace(new RegExp(`^/api/${serviceName}`), '/api');
       },
       onProxyReq: (proxyReq: any, req: any) => {
         // Add request ID
@@ -306,6 +343,10 @@ class APIGateway {
         if (req.headers.authorization) {
           proxyReq.setHeader('Authorization', req.headers.authorization)
         }
+
+        // Add diagnostic headers
+        proxyReq.setHeader('X-Gateway-Matched', 'true')
+        proxyReq.setHeader('X-Gateway-Service', serviceName)
       },
       onProxyRes: (proxyRes: any, req: any, res: any) => {
         // Log response
@@ -327,15 +368,30 @@ class APIGateway {
 
       try {
         // Check if route is allowed
-        const routePath = `${req.method} ${req.path}`
+        const cleanPath = req.path.replace(/\/$/, '') || '/' // Remove trailing slash para comparação
+        
         const isAllowed = allowedRoutes.some(route => {
-          const [method, path] = route.split(' ')
-          return method === req.method && req.path.match(path.replace('*', '.*'))
+          const [method, routePath] = route.split(' ')
+          if (method !== req.method) return false
+
+          // Converte caminhos com :id ou * em expressões regulares funcionais
+          // Escapa caracteres especiais de regex e transforma :id em [^/]+
+          const regexString = routePath
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escapa caracteres especiais
+            .replace(/\\:\w+/g, '[^/]+')             // Converte :id em qualquer coisa exceto /
+            .replace(/\\\*/g, '.*')                  // Converte * em qualquer coisa
+
+          const regex = new RegExp(`^${regexString}/?$`) // Permite barra opcional no final
+          return regex.test(cleanPath)
         })
 
         if (!isAllowed) {
-          return res.status(404).json({ error: 'Route not found' })
+          // Log detalhado de bloqueio para diagnóstico
+          console.warn(`[Gateway] Blocked: ${req.method} ${req.path} (Service: ${serviceName})`)
+          return next()
         }
+
+        console.log(`[Gateway] Allowed: ${req.method} ${req.path} -> ${serviceName}`)
 
         // Check cache for GET requests
         if (req.method === 'GET') {

@@ -33,17 +33,27 @@ import pharmacyRoutes from './pharmacy.routes.js'; // NOVO: Farmácia Pro 2.0
 import subscriptionRoutes from './subscription.routes.js'; // NOVO: Motor de Recorrência
 import familyRoutes from './family.routes.js'; // NOVO: Gestão Familiar (Onda 2)
 import timelineRoutes from './timeline.routes.js'; // NOVO: Timeline de Saúde (Onda 3)
+import growthRoutes from './growth.routes.js';
+import partnerProfileRoutes from './partner/profile.routes.js';
+import partnerFinanceRoutes from './partner/finance.routes.js';
+import partnerManagementRoutes from './partner/management.routes.js';
 // import chatRoutes from './chat.routes.js';
 
 const router = Router();
 console.log('[API] Registrando rotas de Timeline (Prioridade Máxima)...');
 
 // 1. API Core Routes
-router.use('/timeline', timelineRoutes); // Prioridade máxima (Fallback + Onda 3)
-router.use('/patients/timeline', timelineRoutes); // Alias padronizado
+router.use('/timeline', timelineRoutes);
+router.use('/patients/timeline', timelineRoutes);
 router.use('/auth', authRoutes);
+router.use('/growth', growthRoutes);
 router.use('/patients', patientRoutes);
-router.use('/partners', partnerRoutes);
+
+// Modular Partner Routes (Fase 6)
+router.use('/partners', partnerProfileRoutes);
+router.use('/partners', partnerFinanceRoutes);
+router.use('/partners', partnerManagementRoutes);
+router.use('/partners', partnerRoutes); // Fallback legado para as outras 2.500 linhas
 
 // 2. Admin & Management
 router.use('/admin/financial', financialRoutes);
@@ -78,6 +88,7 @@ router.use('/health-tools', healthToolRoutes);
 router.use('/pharmacy', pharmacyRoutes); // NOVO: Farmácia Pro 2.0
 router.use('/subscriptions', subscriptionRoutes); // NOVO: Motor de Recorrência
 router.use('/family', familyRoutes); // NOVO: Gestão Familiar (Onda 2)
+router.use('/growth', growthRoutes); // NOVO: Impulso de Crescimento
 // router.use('/timeline', timelineRoutes); // Movido para o topo
 router.post('/errors', (req, res) => {
     console.error('[FRONTEND ERROR]', req.body);

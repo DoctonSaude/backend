@@ -274,7 +274,7 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
     });
 
     // Criar URL de verificação
-    const appUrl = process.env.APP_URL || 'http://localhost:5173';
+    const appUrl = process.env.APP_URL || 'https://app.docton.com.br';
     const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
 
     // Hash da senha
@@ -374,6 +374,7 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
       }).catch(err => logger.error('Erro ao notificar admin sobre novo paciente:', err));
     }
 
+    /*
     // Enviar email de verificação (não-bloqueante)
     try {
       if (newUser && email) {
@@ -387,6 +388,8 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
     } catch (emailError) {
       logger.error('[auth] Erro ao enviar email de verificação (não-bloqueante):', emailError);
     }
+    */
+    logger.info('[auth] Email de verificação ignorado (Temporário)');
 
     const updatedUser = await prisma.user.findUnique({
       where: { id: newUser.id },
@@ -518,7 +521,7 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
     });
 
     // Criar URL de verificação
-    const appUrl = process.env.APP_URL || 'http://localhost:5173';
+    const appUrl = process.env.APP_URL || 'https://app.docton.com.br';
     const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
 
     // Enviar email
@@ -552,7 +555,7 @@ router.post('/forgot-password', async (req: Request, res: Response, next: NextFu
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.APP_URL || 'http://localhost:5173'}/reset-password`,
+      redirectTo: `${process.env.APP_URL || 'https://app.docton.com.br'}/reset-password`,
     });
 
     if (error) {

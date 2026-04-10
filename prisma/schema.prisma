@@ -101,6 +101,7 @@ model User {
   tenant            Tenant?            @relation(fields: [tenantId], references: [id])
   userProductStats  UserProductStats[]
   roles             Role[]             @relation("RoleToUser")
+  notifications     Notification[]
 }
 
 model Person {
@@ -170,6 +171,7 @@ model Partner {
   combos                   ServiceCombo[]
   availabilityRequests     AvailabilityRequest[]
   equipment                Equipment[]
+  materials                ClinicMaterial[]
   favorites                FavoritePartner[]
   medicalQuotes            MedicalQuote[]
   medicalRecords           MedicalRecord[]
@@ -193,9 +195,26 @@ model Partner {
   Transaction              Transaction[]
   transfers                Transfer[]
   validationLogs           ValidationCodeLog[]
+  rankingScore             Float                    @default(0)
+  totalImpressions        Int                       @default(0)
+  totalClicks             Int                       @default(0)
+  boosts                  PartnerBoost[]
 
   @@index([specialty])
   @@index([institution])
+}
+
+model PartnerBoost {
+  id          String   @id @default(cuid())
+  partnerId   String
+  type        String   // SEARCH_TOP, REGIONAL_DOMAIN, TEMPORARY, SPONSORED_LEAD
+  status      String   @default("ACTIVE") // ACTIVE, EXPIRED, PAUSED
+  price       Float
+  config      Json?    // Ex: { "bairro": "Setor Bueno", "keywords": [...] }
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  partner     Partner  @relation(fields: [partnerId], references: [id])
 }
 
 model Patient {
@@ -327,6 +346,9 @@ model Appointment {
   review         Review?
   validationLogs ValidationCodeLog[]
   prescriptions  Prescription[]
+  serviceId      String?
+  transactions   PartnerTransaction[]
+  service        PartnerService?     @relation(fields: [serviceId], references: [id])
 
   @@index([patientId])
   @@index([partnerId])
@@ -636,6 +658,7 @@ model PartnerService {
   partner            Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   serviceCategory    ServiceCategory? @relation(fields: [serviceCategoryId], references: [id])
   combos             ServiceCombo[]
+  appointments_list  Appointment[]
 
   @@index([partnerId])
 }
@@ -1179,11 +1202,14 @@ model Notification {
   type      String?
   read      Boolean  @default(false)
   link      String?
-  data      String?
-  dataJson  Json?
+  data      Json?    @default("{}") @map("dataJson")
   priority  String?  @default("medium")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model HealthTip {
@@ -1226,6 +1252,7 @@ model Equipment {
   name         String
   partnerId    String
   status       String        @default("AVAILABLE")
+  useCount     Int           @default(0)
   isActive     Boolean       @default(true)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -1921,6 +1948,7 @@ model PartnerTransaction {
   status        String   @default("PENDING")
   availableAt   DateTime?
   createdAt     DateTime @default(now())
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 }
 
@@ -1934,3 +1962,19 @@ model PayoutRequest {
   createdAt   DateTime  @default(now())
   partner     Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 }
+
+model ClinicMaterial {
+  id        String   @id @default(cuid())
+  name      String
+  quantity  Float    @default(0)
+  unit      String   @default("un")
+  category  String?
+  minStock  Float?   @default(0)
+  partnerId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+}
+

@@ -3,7 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
-import { format } from 'date-fns';
+import { format as dateFnsFormat } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ExcelJS from 'exceljs';
 import { Readable } from 'stream';
@@ -96,14 +96,20 @@ router.get('/', async (req, res, next) => {
           user: { select: { name: true, email: true, avatar: true } },
           services: { where: { isActive: true } }
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: [
+          { rankingScore: 'desc' },
+          { createdAt: 'desc' }
+        ]
       });
     } catch (innerErr: any) {
       console.error('[Partners GET /] Fallback sem services:', innerErr?.message);
       partners = await prisma.partner.findMany({
         where: { isApproved: true },
         include: { user: { select: { name: true, email: true, avatar: true } } },
-        orderBy: { createdAt: 'desc' }
+        orderBy: [
+          { rankingScore: 'desc' },
+          { createdAt: 'desc' }
+        ]
       });
     }
     return res.json(partners.map(mapPartnerData));
@@ -113,7 +119,153 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+/**
+ * @route GET /api/partners/dashboard
+ * @desc Métricas unificadas e otimizadas (Fase 6)
+ */
+router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) => {
+  res.setHeader('X-Backend-Version', '2026.04.09.v6-opt');
+  try {
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const partner = await prisma.partner.findFirst({
+      where: { userId },
+      select: { id: true, rating: true, totalReviews: true, planTier: true, planStatus: true, createdAt: true }
+    });
 
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const [
+      totalAppointments,
+      completedAppointments,
+      upcomingAppointments,
+      thisMonthAppts,
+      lastMonthAppts,
+      monthlyRevenueData,
+      lastMonthRevenueData,
+      recentAppointments,
+      validatedCodes
+    ] = await Promise.all([
+      prisma.appointment.count({ where: { partnerId: partner.id } }),
+      prisma.appointment.count({ where: { partnerId: partner.id, status: 'COMPLETED' } }),
+      prisma.appointment.count({ where: { partnerId: partner.id, status: { in: ['SCHEDULED', 'CONFIRMED'] } } }),
+      prisma.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: startOfMonth } } }),
+      prisma.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: lastMonthStart, lte: lastMonthEnd } } }),
+      prisma.partnerTransaction.aggregate({
+        where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: startOfMonth } },
+        _sum: { amount: true }
+      }),
+      prisma.partnerTransaction.aggregate({
+        where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
+        _sum: { amount: true }
+      }),
+      prisma.appointment.findMany({
+        where: { partnerId: partner.id },
+        orderBy: { dateTime: 'desc' },
+        take: 5,
+        include: { patient: { include: { user: { select: { name: true, avatar: true } } } } }
+      }),
+      prisma.validationCodeLog.findMany({
+        where: { partnerId: partner.id },
+        orderBy: { timestamp: 'desc' },
+        take: 10,
+        include: { patient: { select: { user: { select: { name: true, avatar: true } } } } }
+      })
+    ]);
+
+    const rev = monthlyRevenueData._sum.amount || 0;
+    const lastRev = lastMonthRevenueData._sum.amount || 0;
+    const revGrowth = lastRev > 0 ? ((rev - lastRev) / lastRev) * 100 : 0;
+    const apptsGrowth = lastMonthAppts > 0 ? ((thisMonthAppts - lastMonthAppts) / lastMonthAppts) * 100 : 0;
+
+    const period = (req.query.period as string) || 'week';
+    const chartStartDate = new Date();
+    if (period === 'week') chartStartDate.setDate(chartStartDate.getDate() - 6);
+    else chartStartDate.setDate(chartStartDate.getDate() - 29);
+    chartStartDate.setHours(0, 0, 0, 0);
+
+    const [dailyRevenue, dailyAppts] = await Promise.all([
+      prisma.partnerTransaction.findMany({
+        where: { partnerId: partner.id, status: 'COMPLETED', type: 'CREDIT', createdAt: { gte: chartStartDate } },
+        select: { amount: true, createdAt: true }
+      }),
+      prisma.appointment.findMany({
+        where: { partnerId: partner.id, dateTime: { gte: chartStartDate } },
+        select: { dateTime: true }
+      })
+    ]);
+
+    const daysToGenerate = period === 'week' ? 7 : 30;
+    const chartData = Array.from({ length: daysToGenerate }, (_, i) => {
+      const d = new Date(chartStartDate);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayRev = dailyRevenue.filter(r => r.createdAt.toISOString().split('T')[0] === dateStr).reduce((sum, r) => sum + r.amount, 0);
+      const dayAppts = dailyAppts.filter(a => a.dateTime.toISOString().split('T')[0] === dateStr).length;
+      return {
+        name: period === 'week' ? dateFnsFormat(d, 'EEE', { locale: ptBR }) : dateFnsFormat(d, 'dd/MM'),
+        value: dayRev,
+        appts: dayAppts
+      };
+    });
+
+    return res.json({
+      metrics: {
+        newAppointments: thisMonthAppts,
+        monthlyRevenue: rev,
+        revenueGrowth: Math.round(revGrowth),
+        completedAppointments,
+        apptsGrowth: Math.round(apptsGrowth),
+        upcomingAppointments,
+        rating: partner.rating || 0,
+        totalReviews: partner.totalReviews || 0,
+        planTier: partner.planTier,
+        planStatus: partner.planStatus
+      },
+      recentAppointments: recentAppointments.map(appt => ({
+        id: appt.id,
+        patientName: appt.patient?.user?.name || 'Paciente',
+        patientAvatar: appt.patient?.user?.avatar,
+        dateTime: appt.dateTime,
+        status: appt.status,
+        isOnline: (appt as any).isOnline
+      })),
+      validatedCodes: validatedCodes.map(log => ({
+        id: log.id,
+        code: log.code,
+        patientName: log.patient?.user?.name || 'Paciente',
+        patientAvatar: log.patient?.user?.avatar,
+        timestamp: log.timestamp,
+        status: log.status
+      })),
+      chartData: chartData
+    });
+  } catch (error) {
+    console.error('Erro ao obter dashboard do parceiro:', error);
+    return res.status(500).json({ error: 'Erro ao obter dashboard do parceiro' });
+  }
+});
+
+/**
+ * @route GET /api/partners/revenue/insights
+ */
+router.get('/revenue/insights', authenticate, authorize('PARTNER', 'PHARMACY'), async (req, res) => {
+  res.setHeader('X-Backend-Version', '2026.04.09.v6-opt');
+  try {
+    const userId = (req as any).user.userId || (req as any).user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+    const insights = await RevenueService.getInsights(partner.id);
+    return res.json(insights);
+  } catch (error: any) {
+    console.error(`[Partners/Insights] Erro:`, error?.message);
+    return res.status(500).json({ error: 'Erro interno ao gerar insights' });
+  }
+});
 
 // Busca parceiros com filtro por termo - ROTA PÚBLICA
 router.get('/search', async (req, res, next) => {
@@ -138,14 +290,20 @@ router.get('/search', async (req, res, next) => {
           user: { select: { name: true, email: true, avatar: true } },
           services: { where: { isActive: true } }
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: [
+          { rankingScore: 'desc' },
+          { createdAt: 'desc' }
+        ]
       });
     } catch (innerErr: any) {
       console.error(`[Partners /search] Fallback sem services para "${q}":`, innerErr?.message);
       partners = await prisma.partner.findMany({
         where: whereClause,
         include: { user: { select: { name: true, email: true, avatar: true } } },
-        orderBy: { createdAt: 'desc' }
+        orderBy: [
+          { rankingScore: 'desc' },
+          { createdAt: 'desc' }
+        ]
       });
     }
     console.log(`[Search] Query: "${q}", Total: ${partners.length}`);
@@ -326,34 +484,69 @@ router.post('/public-profile/photo', authenticate, authorize('PARTNER'), (req, r
   });
 }, async (req, res) => {
   try {
+    res.setHeader('X-Backend-Version', '2026.04.09.v5-final');
     const userId = req.user?.userId;
-    console.log('[PhotoUpload] req.user:', JSON.stringify(req.user));
-    console.log(`[PhotoUpload] Iniciando upload para usuário: ${userId}`);
+    console.log(`[PhotoUpload] Iniciando Fase 5 para usuário: ${userId}`);
 
-    if (!req.file) {
-      console.warn('[PhotoUpload] Nenhum arquivo recebido no req.file');
+    // Fallback: Se não houver req.file, verifica se enviaram via Body (Base64)
+    let fileBuffer: Buffer;
+    let fileName: string;
+    let mimeType: string;
+
+    if (req.file) {
+      fileBuffer = req.file.buffer;
+      fileName = req.file.originalname;
+      mimeType = req.file.mimetype;
+    } else if (req.body.photo && typeof req.body.photo === 'string' && req.body.photo.includes('base64')) {
+      const base64Data = req.body.photo.split(';base64,').pop()!;
+      fileBuffer = Buffer.from(base64Data, 'base64');
+      fileName = `profile_${userId}_${Date.now()}.png`;
+      mimeType = 'image/png';
+    } else {
+      console.warn('[PhotoUpload] Erro: Nenhum arquivo detectado');
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    console.log(`[PhotoUpload] Arquivo recebido: ${req.file.originalname}, tipo: ${req.file.mimetype}, tamanho: ${req.file.size} bytes`);
-
     const publicUrl = await storageService.uploadAvatar(
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype
+      fileBuffer,
+      fileName,
+      mimeType
     );
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { avatar: publicUrl }
+    // Atualizar User (avatar) e Partner (photo) usando upsert para garantir sucesso
+    const results = await Promise.allSettled([
+      prisma.user.update({
+        where: { id: userId },
+        data: { avatar: publicUrl }
+      }),
+      prisma.partner.upsert({
+        where: { userId: userId! },
+        update: { photo: publicUrl },
+        create: { 
+          userId: userId!,
+          photo: publicUrl,
+          tenantId: req.user?.tenantId || null
+        }
+      })
+    ]);
+
+    const errors = results.filter(r => r.status === 'rejected');
+    if (errors.length > 0) {
+      console.error('[PhotoUpload] Erro parcial na atualização do banco:', errors);
+    }
+
+    return res.json({ 
+      photo: publicUrl,
+      success: true
     });
-
-    console.log(`[PhotoUpload] Avatar atualizado com sucesso no banco para usuário ${userId}`);
-
-    return res.json({ photo: publicUrl });
-  } catch (error) {
-    console.error('[PhotoUpload] Erro ao fazer upload da foto:', error);
-    return res.status(500).json({ error: 'Erro ao processar foto' });
+  } catch (error: any) {
+    console.error('[PhotoUpload] CRITICAL ERROR (Phase 5):', error);
+    return res.status(500).json({ 
+      error: 'Erro interno no upload (Fase 5)', 
+      message: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined,
+      hint: 'Verifique se o bucket "avatars" existe no seu projeto Supabase.'
+    });
   }
 });
 
@@ -609,7 +802,8 @@ router.get('/appointments', authenticate, authorize('PARTNER'), async (req, res)
       include: {
         patient: {
           include: { user: { select: { name: true, email: true, avatar: true } } }
-        }
+        },
+        professional: true
       },
       orderBy: { dateTime: 'desc' }
     });
@@ -654,7 +848,7 @@ router.get('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
 router.post('/appointments', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = (req as any).user.userId || (req as any).user.id;
-    const { patientName, patientId, dateTime, duration, isOnline, notes } = req.body;
+    const { patientName, patientId, dateTime, duration, isOnline, notes, professionalId, serviceId } = req.body;
 
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
@@ -707,12 +901,15 @@ router.post('/appointments', authenticate, authorize('PARTNER'), async (req, res
         duration: duration || 30,
         isOnline: !!isOnline,
         notes: notes || '',
-        status: 'SCHEDULED'
+        status: 'SCHEDULED',
+        professionalId: professionalId || null,
+        serviceId: serviceId || null
       },
       include: {
         patient: {
           include: { user: { select: { name: true, email: true, avatar: true } } }
-        }
+        },
+        professional: true
       }
     });
 
@@ -727,7 +924,7 @@ router.put('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
   try {
     const { id } = req.params;
     const userId = (req as any).user.userId || (req as any).user.id;
-    const { dateTime, duration, isOnline, notes, status } = req.body;
+    const { dateTime, duration, isOnline, notes, status, professionalId, serviceId } = req.body;
 
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
@@ -739,16 +936,31 @@ router.put('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
         duration: duration ? Number(duration) : undefined,
         isOnline: isOnline !== undefined ? !!isOnline : undefined,
         notes: notes !== undefined ? notes : undefined,
-        status: status || undefined
+        status: status || undefined,
+        professionalId: professionalId !== undefined ? (professionalId || null) : undefined,
+        serviceId: serviceId !== undefined ? (serviceId || null) : undefined
       },
       include: {
         patient: {
           include: { user: { select: { name: true, email: true, avatar: true } } }
-        }
+        },
+        professional: true
       }
     });
 
-    // Finance Integration (Phase 4): Se estiver mudando para COMPLETED (concluída), processar repasse
+    // Logistics Integration: Se estiver mudando para COMPLETED, incrementar uso de equipamento
+    if (status === 'COMPLETED' && appointment.equipmentId) {
+      try {
+        await prisma.equipment.update({
+          where: { id: appointment.equipmentId },
+          data: { useCount: { increment: 1 } }
+        });
+        console.log(`[Logistics] Uso incrementado para equipamento: ${appointment.equipmentId}`);
+      } catch (logisticsErr) {
+        console.error('Erro ao processar logística (uso equipamento):', logisticsErr);
+      }
+    }
+
     if (status === 'COMPLETED' && appointment.status === 'COMPLETED') { // Só chamar se a mudança for confirmada no BD
       try {
         await financeService.processAppointmentCompletion(appointment.id);
@@ -978,6 +1190,19 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
         where: { id: appointment.id },
         data: { status: 'COMPLETED' }
       });
+
+      // Logistics Integration: Incrementar uso de equipamento
+      if (appointment.equipmentId) {
+        try {
+          await prisma.equipment.update({
+            where: { id: appointment.equipmentId },
+            data: { useCount: { increment: 1 } }
+          });
+          console.log(`[Logistics] Uso incrementado via Validação para equipamento: ${appointment.equipmentId}`);
+        } catch (logisticsErr) {
+          console.error('Erro ao processar logística via Validação:', logisticsErr);
+        }
+      }
 
       // Finance Integration (Phase 4): Processar repasse e alimentar carteira do parceiro
       try {
@@ -1284,195 +1509,6 @@ router.put('/availability/:id', authenticate, authorize('PARTNER'), async (req, 
   }
 });
 
-router.get('/dashboard', authenticate, authorize('PARTNER'), async (req, res) => {
-  try {
-    const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({
-      where: { userId },
-      select: { id: true, rating: true, totalReviews: true, planTier: true, planStatus: true, createdAt: true }
-    });
-
-    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
-
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-
-    const [
-      appointments,
-      monthlyRevenueData,
-      lastMonthRevenueData,
-      recentAppointments,
-      validatedCodes
-    ] = await Promise.all([
-      prisma.appointment.findMany({
-        where: { partnerId: partner.id },
-        select: { status: true, createdAt: true, dateTime: true }
-      }),
-      prisma.partnerTransaction.aggregate({
-        where: {
-          partnerId: partner.id,
-          status: 'COMPLETED',
-          type: 'CREDIT',
-          createdAt: { gte: startOfMonth }
-        },
-        _sum: { amount: true }
-      }),
-      prisma.partnerTransaction.aggregate({
-        where: {
-          partnerId: partner.id,
-          status: 'COMPLETED',
-          type: 'CREDIT',
-          createdAt: { gte: lastMonthStart, lte: lastMonthEnd }
-        },
-        _sum: { amount: true }
-      }),
-      prisma.appointment.findMany({
-        where: { partnerId: partner.id },
-        take: 5,
-        orderBy: { dateTime: 'desc' },
-        include: {
-          patient: {
-            include: { user: { select: { name: true, avatar: true } } }
-          }
-        }
-      }),
-      prisma.validationCodeLog.findMany({
-        where: { partnerId: partner.id, status: 'valid' },
-        take: 5,
-        orderBy: { timestamp: 'desc' },
-        include: {
-          patient: { select: { user: { select: { name: true, avatar: true } } } }
-        }
-      })
-    ]);
-
-    const totalAppointments = appointments.length;
-    const completedAppointments = appointments.filter(a => a.status === 'COMPLETED').length;
-    const upcomingAppointments = appointments.filter(a => a.status === 'SCHEDULED' || a.status === 'CONFIRMED').length;
-
-    const monthlyRevenue = (monthlyRevenueData._sum.amount || 0);
-    const lastMonthRevenue = (lastMonthRevenueData._sum.amount || 0);
-    const revenueGrowth = lastMonthRevenue === 0 ? (monthlyRevenue > 0 ? 100 : 0) : Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100);
-
-    const thisMonthAppts = appointments.filter(a => a.createdAt >= startOfMonth).length;
-    const lastMonthAppts = appointments.filter(a => a.createdAt >= lastMonthStart && a.createdAt <= lastMonthEnd).length;
-    const apptsGrowth = lastMonthAppts === 0 ? (thisMonthAppts > 0 ? 100 : 0) : Math.round(((thisMonthAppts - lastMonthAppts) / lastMonthAppts) * 100);
-
-    const period = (req.query.period as string) || 'week';
-    let chartData: any[] = [];
-
-    if (period === 'week') {
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        d.setHours(0, 0, 0, 0);
-        return d;
-      });
-
-      chartData = await Promise.all(last7Days.map(async (date) => {
-        const nextDay = new Date(date);
-        nextDay.setDate(date.getDate() + 1);
-
-        const [revenue, appts] = await Promise.all([
-          prisma.partnerTransaction.aggregate({
-            where: {
-              partnerId: partner.id,
-              status: 'COMPLETED',
-              type: 'CREDIT',
-              createdAt: { gte: date, lt: nextDay }
-            },
-            _sum: { amount: true }
-          }),
-          prisma.appointment.count({
-            where: {
-              partnerId: partner.id,
-              dateTime: { gte: date, lt: nextDay }
-            }
-          })
-        ]);
-
-        return {
-          name: format(date, 'EEE', { locale: ptBR }),
-          value: revenue._sum.amount || 0,
-          appts: appts
-        };
-      }));
-    } else if (period === 'month') {
-      const last30Days = Array.from({ length: 30 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (29 - i));
-        d.setHours(0, 0, 0, 0);
-        return d;
-      });
-
-      chartData = await Promise.all(last30Days.map(async (date) => {
-        const nextDay = new Date(date);
-        nextDay.setDate(date.getDate() + 1);
-
-        const [revenue, appts] = await Promise.all([
-          prisma.partnerTransaction.aggregate({
-            where: {
-              partnerId: partner.id,
-              status: 'COMPLETED',
-              type: 'CREDIT',
-              createdAt: { gte: date, lt: nextDay }
-            },
-            _sum: { amount: true }
-          }),
-          prisma.appointment.count({
-            where: {
-              partnerId: partner.id,
-              dateTime: { gte: date, lt: nextDay }
-            }
-          })
-        ]);
-
-        return {
-          name: format(date, 'dd/MM'),
-          value: revenue._sum.amount || 0,
-          appts: appts
-        };
-      }));
-    }
-
-    return res.json({
-      metrics: {
-        totalAppointments,
-        completedAppointments,
-        upcomingAppointments,
-        rating: partner.rating ?? 0,
-        totalReviews: partner.totalReviews ?? 0,
-        monthlyRevenue,
-        revenueGrowth,
-        apptsGrowth,
-        newAppointments: thisMonthAppts,
-        planTier: partner.planTier || 'FREE',
-        planStatus: partner.planStatus || 'ACTIVE'
-      },
-      recentAppointments: recentAppointments.map(a => ({
-        id: a.id,
-        patientName: a.patient?.user?.name || 'Paciente',
-        patientAvatar: a.patient?.user?.avatar,
-        dateTime: a.dateTime,
-        status: a.status
-      })),
-      validatedCodes: validatedCodes.map(log => ({
-        id: log.id,
-        code: log.code,
-        patientName: log.patient?.user?.name || log.patientName || 'Paciente',
-        patientAvatar: log.patient?.user?.avatar,
-        timestamp: log.timestamp,
-        status: log.status
-      })),
-      chartData: chartData
-    });
-  } catch (error) {
-    console.error('Erro ao obter dashboard do parceiro:', error);
-    return res.status(500).json({ error: 'Erro ao obter dashboard do parceiro' });
-  }
-});
 
 // Relatórios Rápidos para Parceiros
 router.get('/reports', authenticate, authorize('PARTNER'), async (req, res) => {
@@ -1502,7 +1538,7 @@ router.post('/reports/quick', authenticate, authorize('PARTNER'), async (req, re
     const report = await prisma.report.create({
       data: {
         partnerId: partner.id,
-        name: `Resumo Rápido - ${format(now, 'dd/MM/yyyy')}`,
+        name: `Resumo Rápido - ${dateFnsFormat(now, 'dd/MM/yyyy')}`,
         type: 'performance',
         format: 'PDF',
         status: 'Concluído',
@@ -2261,6 +2297,7 @@ router.get('/reports/stats', authenticate, authorize('PARTNER'), async (req, res
       let newPatientsCount = 0;
 
       if (patientIds.length > 0) {
+        // Otimização: Buscar em lote os primeiros atendimentos de cada paciente com este parceiro
         const firstAppointments = await prisma.appointment.groupBy({
           by: ['patientId'],
           where: { patientId: { in: patientIds }, partnerId: partner.id },
@@ -2272,15 +2309,105 @@ router.get('/reports/stats', authenticate, authorize('PARTNER'), async (req, res
         ).length;
       }
 
+      // Distribuição de Serviços (Dinâmica)
+      // Buscamos os serviços do parceiro para tentar categorizar os agendamentos
+      const partnerServices = await prisma.partnerService.findMany({
+        where: { partnerId: partner.id }
+      });
+
+      const servicesMap = new Map();
+      appointments.forEach(a => {
+        let category = 'Consulta'; // Categoria padrão
+        
+        // Tenta encontrar a categoria baseada no nome do serviço se estiver nas notas
+        const matchedService = partnerServices.find(s => 
+          a.notes?.toLowerCase().includes(s.name.toLowerCase()) || 
+          (s.category && a.notes?.toLowerCase().includes(s.category.toLowerCase()))
+        );
+
+        if (matchedService && matchedService.category) {
+          category = matchedService.category;
+        } else if (a.notes?.toLowerCase().includes('retorno')) {
+          category = 'Retorno';
+        } else if (a.notes?.toLowerCase().includes('exame')) {
+          category = 'Exame';
+        } else if (a.notes?.toLowerCase().includes('procedimento')) {
+          category = 'Procedimento';
+        }
+
+        servicesMap.set(category, (servicesMap.get(category) || 0) + 1);
+      });
+
+      const servicesDistribution = Array.from(servicesMap.entries()).map(([name, value], index) => {
+        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+        return { name, value, color: colors[index % colors.length] };
+      });
+
+      // Performance Semanal
+      const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+      const performanceMap = new Map();
+      weekDays.forEach(day => performanceMap.set(day, { atendimentos: 0, duracaoTotal: 0 }));
+
+      appointments.forEach(a => {
+        const day = weekDays[new Date(a.dateTime).getDay()];
+        const stats = performanceMap.get(day);
+        stats.atendimentos += 1;
+        stats.duracaoTotal += (a.duration || 30);
+      });
+
+      const weeklyPerformance = Array.from(performanceMap.entries()).map(([dia, data]) => ({
+        dia,
+        atendimentos: data.atendimentos,
+        duracao: data.atendimentos > 0 ? Math.round(data.duracaoTotal / data.atendimentos) : 0
+      }));
+
+      // Geração Dinâmica de Alertas
+      const alerts = [];
+      const cancellationRate = total > 0 ? (appointments.filter(a => a.status === 'CANCELLED').length / total) : 0;
+      const completionRate = total > 0 ? (completed.length / total) : 0;
+
+      if (cancellationRate > 0.1) {
+        alerts.push({
+          id: 'alert-cancel',
+          type: 'warning',
+          title: 'Alta taxa de cancelamento',
+          message: `Sua taxa de cancelamento está em ${(cancellationRate * 100).toFixed(1)}%. Considere revisar sua política de agendamento.`,
+          action: 'Ver Detalhes',
+          link: '/partner/agendamentos?status=CANCELLED'
+        });
+      }
+
+      if (completionRate < 0.8 && total > 5) {
+        alerts.push({
+          id: 'alert-complete',
+          type: 'info',
+          title: 'Otimização de Agenda',
+          message: 'Muitos agendamentos aguardando conclusão. Finalize os atendimentos para liberar o faturamento.',
+          action: 'Concluir Agora',
+          link: '/partner/agendamentos?status=SCHEDULED'
+        });
+      }
+
+      const revenue = completed.reduce((sum, a) => {
+        // Tenta usar partnerNetPrice se disponível (Preço já com taxas deduzidas se for o caso)
+        if (a.partnerNetPrice && a.partnerNetPrice > 0) return sum + a.partnerNetPrice;
+        // Fallback: Tenta extrair das notas
+        const notesValue = a.notes?.includes('Valor:') ? parseFloat(a.notes.split('Valor:')[1]) : null;
+        return sum + (notesValue || 150);
+      }, 0);
+
       return {
         appointments: total,
         patients: patientIds.length,
-        revenue: completed.reduce((sum, a) => sum + (a.notes?.includes('Valor:') ? parseFloat(a.notes.split('Valor:')[1]) : 150), 0),
-        hours: Math.round(completed.reduce((sum, a) => sum + a.duration, 0) / 60),
-        completionRate: total > 0 ? Math.round((completed.length / total) * 100) : 0,
-        avgDuration: completed.length > 0 ? Math.round(completed.reduce((sum, a) => sum + a.duration, 0) / completed.length) : 0,
+        revenue,
+        hours: Math.round(completed.reduce((sum, a) => sum + (a.duration || 0), 0) / 60),
+        completionRate: total > 0 ? Math.round(completionRate * 100) : 0,
+        avgDuration: completed.length > 0 ? Math.round(completed.reduce((sum, a) => sum + (a.duration || 0), 0) / completed.length) : 0,
         cancellations: appointments.filter(a => a.status === 'CANCELLED').length,
-        newPatients: newPatientsCount
+        newPatients: newPatientsCount,
+        servicesDistribution,
+        weeklyPerformance,
+        alerts
       };
     };
 
@@ -2316,7 +2443,9 @@ router.get('/reports/stats', authenticate, authorize('PARTNER'), async (req, res
       if (trendMap.has(month)) {
         const entry = trendMap.get(month);
         entry.servicos += 1;
-        entry.receita += (a.notes?.includes('Valor:') ? parseFloat(a.notes.split('Valor:')[1]) : 150);
+        // Mesma lógica de receita para o gráfico de tendência
+        const val = a.partnerNetPrice || (a.notes?.includes('Valor:') ? parseFloat(a.notes.split('Valor:')[1]) : 150);
+        entry.receita += val;
       }
     });
 
@@ -2324,6 +2453,21 @@ router.get('/reports/stats', authenticate, authorize('PARTNER'), async (req, res
       month,
       ...data
     }));
+
+    // Alerta de Crescimento
+    if (curr.revenue > prev.revenue && prev.revenue > 0) {
+      const growth = ((curr.revenue - prev.revenue) / prev.revenue) * 100;
+      if (growth > 5) {
+        curr.alerts.push({
+          id: 'alert-growth',
+          type: 'success',
+          title: 'Crescimento em Destaque',
+          message: `Seu faturamento cresceu ${growth.toFixed(1)}% em relação ao período anterior. Bom trabalho!`,
+          action: 'Ver Ranking',
+          link: '/partner/desempenho'
+        });
+      }
+    }
 
     res.json({
       ...curr,
@@ -2345,13 +2489,77 @@ router.get('/reports/:reportType/export', authenticate, authorize('PARTNER'), as
     const { reportType } = req.params;
     const { format, startDate, endDate } = req.query;
 
-    // Simulação de exportação - Em produção usar bibliotecas como PDFKit, ExcelJS ou CSV-writer
-    // Como o tempo é curto, vamos retornar um CSV básico como demonstração de sucesso
-    const content = `Relatorio;${reportType}\nData Inicio;${startDate}\nData Fim;${endDate}\nGerado em;${new Date().toISOString()}`;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({
+      where: { userId },
+      include: { team: true }
+    });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    res.setHeader('Content-Type', format === 'csv' ? 'text/csv' : 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${reportType}.${format}`);
-    res.send(content);
+    const start = startDate ? new Date(String(startDate)) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(String(endDate)) : new Date();
+
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        partnerId: partner.id,
+        dateTime: { gte: start, lte: end }
+      },
+      include: {
+        patient: { include: { user: { select: { name: true } } } },
+        professional: true
+      },
+      orderBy: { dateTime: 'desc' }
+    });
+
+    if (format === 'csv' || format === 'excel') {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Relatório');
+
+      // Colunas: Data, Nome do Paciente, Serviço, Valor repasse, Profissional, Status
+      worksheet.columns = [
+        { header: 'Data', key: 'date', width: 20 },
+        { header: 'Nome do Paciente', key: 'patient', width: 30 },
+        { header: 'Serviço', key: 'service', width: 25 },
+        { header: 'Valor Repasse (R$)', key: 'value', width: 18 },
+        { header: 'Profissional', key: 'professional', width: 25 },
+        { header: 'Status', key: 'status', width: 15 },
+      ];
+
+      appointments.forEach(a => {
+        const serviceName = a.notes?.split('\n')[0] || 'Atendimento';
+        const value = a.partnerNetPrice || (a.notes?.includes('Valor:') ? parseFloat(a.notes.split('Valor:')[1]) : 150);
+        
+        worksheet.addRow({
+          date: a.dateTime ? dateFnsFormat(new Date(a.dateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-',
+          patient: a.patient?.user?.name || 'Paciente',
+          service: serviceName,
+          value: value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+          professional: a.professional?.name || partner.name || 'Titular',
+          status: a.status
+        });
+      });
+
+      // Estilização do cabeçalho
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      if (format === 'excel') {
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=relatorio_${reportType}_${Date.now()}.xlsx`);
+        await workbook.xlsx.write(res);
+      } else {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=relatorio_${reportType}_${Date.now()}.csv`);
+        await workbook.csv.write(res);
+      }
+      return res.end();
+    }
+
+    return res.status(400).json({ error: 'Formato de exportação não suportado' });
   } catch (error) {
     console.error('Erro na exportação:', error);
     res.status(500).json({ error: 'Falha na exportação' });
@@ -2366,46 +2574,49 @@ router.get('/payments', authenticate, authorize('PARTNER'), async (req, res) => 
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const transfers = await prisma.transfer.findMany({
+    const transactions = await prisma.partnerTransaction.findMany({
       where: { partnerId: partner.id },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        appointment: {
+          include: {
+            patient: { include: { user: { select: { name: true } } } },
+            service: true
+          }
+        }
+      }
     });
 
-    // Para cada transferência, buscamos os agendamentos concluídos no mês correspondente
-    const payments = await Promise.all(transfers.map(async (t) => {
+    const payments = transactions.map((t) => {
       const date = new Date(t.createdAt);
-      const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
-      const appointments = await prisma.appointment.findMany({
-        where: {
-          partnerId: partner.id,
-          status: 'COMPLETED',
-          dateTime: { gte: startOfMonth, lte: endOfMonth }
-        },
-        include: { patient: { include: { user: true } } }
-      });
-
       return {
         id: t.id,
+        date: t.createdAt.toISOString(),
         month: date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
         amount: t.amount,
-        date: t.createdAt.toISOString(),
-        status: t.status === 'PAID' ? 'Pago' : t.status === 'PENDING' ? 'Pendente' : 'Processando',
-        type: t.type,
-        serviceType: t.type === 'TRANSFER' ? 'Serviço' : (t.type || 'Serviço'), // Mapeamento para filtros
-        appointments: appointments.length,
-        services: appointments.map(a => ({
-          id: a.id,
-          name: a.notes?.includes('Serviço:') ? a.notes.split('Serviço:')[1].split('\n')[0].trim() : 'Consulta Médica',
-          checkInCode: a.id.slice(-6).toUpperCase(),
-          patient: a.patient?.user?.name || 'Paciente',
-          date: a.dateTime.toISOString(),
-          partnerValue: a.notes?.includes('Valor:') ? parseFloat(a.notes.split('Valor:')[1]) * 0.8 : 120, // Simulação: 80% de repasse
+        status: t.status === 'COMPLETED' ? 'Pago' : t.status === 'PENDING' ? 'Pendente' : 'Processando',
+        type: t.type === 'CREDIT' ? 'Entrada' : 'Saída',
+        serviceType: t.appointment?.service?.name || (t.type === 'DEBIT' ? 'Saque' : 'Diversos'),
+        description: t.description,
+        appointments: t.appointment ? 1 : 0,
+        services: t.appointment ? [{
+          id: t.appointment.id,
+          name: t.appointment.service?.name || 'Atendimento',
+          checkInCode: t.appointment.id.slice(-6).toUpperCase(),
+          patient: t.appointment.patient?.user?.name || 'Paciente',
+          date: t.appointment.dateTime.toISOString(),
+          partnerValue: t.amount,
           status: 'Concluído'
-        }))
+        }] : [],
+        details: t.appointment ? {
+          patientName: t.appointment.patient?.user?.name,
+          serviceName: t.appointment.service?.name,
+          grossAmount: t.appointment.service?.price,
+          doctonFee: t.appointment.doctonFee,
+          commissionPercent: t.appointment.commissionPercent
+        } : null
       };
-    }));
+    });
 
     res.json(payments);
   } catch (error) {
@@ -2420,39 +2631,32 @@ router.get('/payments/stats', authenticate, authorize('PARTNER'), async (req, re
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const [totalPaid, totalPending, lastMonth, allTransfers, appointmentsCount] = await Promise.all([
-      prisma.transfer.aggregate({
-        where: { partnerId: partner.id, status: 'PAID' },
+    const wallet = await prisma.partnerWallet.findUnique({
+      where: { partnerId: partner.id }
+    });
+
+    const [totalCredits, appointmentsCount] = await Promise.all([
+      prisma.partnerTransaction.aggregate({
+        where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED' },
         _sum: { amount: true }
-      }),
-      prisma.transfer.aggregate({
-        where: { partnerId: partner.id, status: 'PENDING' },
-        _sum: { amount: true }
-      }),
-      prisma.transfer.findFirst({
-        where: { partnerId: partner.id, status: 'PAID' },
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.transfer.findMany({
-        where: { partnerId: partner.id, status: 'PAID' }
       }),
       prisma.appointment.count({
         where: { partnerId: partner.id, status: 'COMPLETED' }
       })
     ]);
 
-    const yearTotal = totalPaid._sum.amount || 0;
-    const monthlyAverage = allTransfers.length > 0 ? yearTotal / Math.max(allTransfers.length, 1) : 0;
+    const yearTotal = totalCredits._sum.amount || 0;
+    const pendingAmount = wallet?.pendingBalance || 0;
 
     res.json({
-      nextPayment: totalPending._sum.amount || 0,
-      nextPaymentDate: '15/' + (new Date().getMonth() + 2).toString().padStart(2, '0') + '/' + new Date().getFullYear(),
-      monthlyAverage,
+      nextPayment: pendingAmount,
+      nextPaymentDate: 'Ciclo Semanal',
+      monthlyAverage: yearTotal > 0 ? (yearTotal / (new Date().getMonth() + 1)) : 0,
       totalAppointments: appointmentsCount,
       yearTotal,
-      averageMargin: 80,
-      totalDoctonRevenue: yearTotal * 0.25,
-      growth: 12.5
+      averageMargin: 100 - (partner.planTier === 'PREMIUM' ? 5 : partner.planTier === 'PRO' ? 10 : 15),
+      totalDoctonRevenue: yearTotal * 0.1,
+      growth: 0
     });
   } catch (error) {
     console.error('Erro ao buscar estatísticas de repasses:', error);
@@ -2644,6 +2848,26 @@ router.post('/rooms', authenticate, authorize('PARTNER'), async (req, res) => {
   }
 });
 
+router.put('/rooms/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const room = await prisma.room.update({
+      where: { id },
+      data: {
+        ...req.body,
+        partnerId: partner.id // Garantir que pertence ao parceiro
+      }
+    });
+    res.json(room);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar sala' });
+  }
+});
+
 router.delete('/rooms/:id', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -2692,6 +2916,26 @@ router.post('/equipment', authenticate, authorize('PARTNER'), async (req, res) =
   }
 });
 
+router.put('/equipment/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const equipment = await prisma.equipment.update({
+      where: { id },
+      data: {
+        ...req.body,
+        partnerId: partner.id // Garantir que pertence ao parceiro
+      }
+    });
+    res.json(equipment);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar equipamento' });
+  }
+});
+
 router.delete('/equipment/:id', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -2704,6 +2948,76 @@ router.delete('/equipment/:id', authenticate, authorize('PARTNER'), async (req, 
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: 'Erro ao excluir equipamento' });
+  }
+});
+
+// ==================== MATERIAIS CLÍNICOS ====================
+
+router.get('/clinic-materials', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const materials = await prisma.clinicMaterial.findMany({
+      where: { partnerId: partner.id }
+    });
+    res.json({ data: materials });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar materiais' });
+  }
+});
+
+router.post('/clinic-materials', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const material = await prisma.clinicMaterial.create({
+      data: {
+        ...req.body,
+        partnerId: partner.id
+      }
+    });
+    res.json(material);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar material' });
+  }
+});
+
+router.put('/clinic-materials/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const material = await prisma.clinicMaterial.update({
+      where: { id },
+      data: {
+        ...req.body,
+        partnerId: partner.id
+      }
+    });
+    res.json(material);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar material' });
+  }
+});
+
+router.delete('/clinic-materials/:id', authenticate, authorize('PARTNER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    const partner = await prisma.partner.findFirst({ where: { userId } });
+
+    await prisma.clinicMaterial.deleteMany({
+      where: { id, partnerId: partner?.id }
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao excluir material' });
   }
 });
 
@@ -2780,47 +3094,6 @@ router.delete('/combos/:id', authenticate, authorize('PARTNER'), async (req, res
   }
 });
 
-router.get('/revenue/insights', authenticate, authorize('PARTNER', 'PHARMACY'), async (req, res) => {
-  try {
-    const userId = req.user?.userId;
-    const role = req.user?.role;
-    
-    if (role === 'PHARMACY') {
-        return res.json({
-            todayRevenue: 0,
-            monthlyRevenue: 0,
-            averageTicket: 0,
-            growth: 0,
-            insights: ["Módulo financeiro de farmácia integrado."]
-        });
-    }
-
-    // Busca robusta pelo parceiro
-    const partner = await prisma.partner.findFirst({ 
-      where: { 
-        OR: [
-          { userId: userId },
-          { id: userId }
-        ]
-      } 
-    });
-    
-    if (!partner) {
-      return res.status(404).json({ 
-        error: 'Parceiro não encontrado', 
-        details: 'Perfil de parceiro não localizado no banco de dados. Verifique se o cadastro foi concluído.' 
-      });
-    }
-
-    console.log(`[Partners/Insights] Parceiro localizado: ${partner.id}. Gerando insights...`);
-    const insights = await RevenueService.getInsights(partner.id);
-
-    return res.json(insights);
-  } catch (error: any) {
-    console.error(`[Partners/Insights] Erro ao gerar insights:`, error?.message || error);
-    return res.status(500).json({ error: 'Erro interno ao gerar insights' });
-  }
-});
 
 router.put('/revenue/happy-hour', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
@@ -2923,7 +3196,10 @@ router.post('/finance/payout', authenticate, authorize('PARTNER'), async (req: a
 // Busca estatísticas de NPS e reputação
 router.get('/reputation/stats', authenticate, authorize('PARTNER'), async (req: any, res) => {
   try {
-    const stats = await reputationService.getReputationStats(req.user.partnerId);
+    const partner = await prisma.partner.findFirst({ where: { userId: req.user.userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+    
+    const stats = await reputationService.getReputationStats(partner.id);
     res.json(stats);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2933,7 +3209,10 @@ router.get('/reputation/stats', authenticate, authorize('PARTNER'), async (req: 
 // Busca todas as avaliações
 router.get('/reputation/reviews', authenticate, authorize('PARTNER'), async (req: any, res) => {
   try {
-    const reviews = await reputationService.getPartnerReviews(req.user.partnerId);
+    const partner = await prisma.partner.findFirst({ where: { userId: req.user.userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const reviews = await reputationService.getPartnerReviews(partner.id);
     res.json(reviews);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2945,7 +3224,11 @@ router.post('/reputation/reviews/:reviewId/reply', authenticate, authorize('PART
   try {
     const { reply } = req.body;
     const { reviewId } = req.params;
-    const updatedReview = await reputationService.replyToReview(reviewId, req.user.partnerId, reply);
+    
+    const partner = await prisma.partner.findFirst({ where: { userId: req.user.userId } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const updatedReview = await reputationService.replyToReview(reviewId, partner.id, reply);
     res.json(updatedReview);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

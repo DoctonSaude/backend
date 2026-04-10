@@ -184,6 +184,7 @@ router.get('/status', authenticate, (req, res) => {
 // GET /api/notifications - Listar notificações do usuário
 router.get('/', authenticate, async (req, res) => {
   try {
+    res.setHeader('X-Backend-Version', '2026.04.09.v3');
     const userId = req.user!.userId;
     const role = req.user!.role;
 
@@ -194,32 +195,22 @@ router.get('/', authenticate, async (req, res) => {
       const notifications = await inAppNotificationService.getNotificationsByUser(userId, includeSystem);
       res.json(notifications);
     } catch (serviceErr: any) {
-      const msg = serviceErr?.message ? String(serviceErr.message) : String(serviceErr);
-      const code = serviceErr?.code;
+      // LOG DETALHADO DO ERRO PARA DIAGNÓSTICO EM PRODUÇÃO
+      const errorStr = serviceErr?.message || String(serviceErr);
+      const errorCode = serviceErr?.code || 'unknown';
+      console.error(`[Notifications Error] Code: ${errorCode}, Message: ${errorStr}`);
 
-      const dbUnavailable =
-        process.env.NODE_ENV === 'production' &&
-        (msg.toLowerCase().includes('tenant or user not found') ||
-          msg.toLowerCase().includes('error querying the database') ||
-          code === 'P1001');
-
-      if (dbUnavailable) {
-        console.log('[Notifications Fallback] DB unavailable; returning empty notifications');
-
-        // Retornar lista vazia para não quebrar o frontend
-        res.json({
-          notifications: [],
-          unreadCount: 0,
-          total: 0,
-          fallback: true
-        });
-        return;
+      // Em produção, se houver QUALQUER erro de banco (ex: tabela ou coluna "dataJson" faltante), 
+      // retornamos lista vazia estruturada para não quebrar o frontend (Dashboard).
+      if (process.env.NODE_ENV === 'production') {
+        return res.json([]);
       }
 
       throw serviceErr;
     }
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar notificações' });
+  } catch (error: any) {
+    console.error('Erro fatal ao buscar notificações:', error);
+    res.status(500).json({ error: 'Erro ao buscar notificações', message: error.message });
   }
 });
 

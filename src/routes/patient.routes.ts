@@ -993,11 +993,41 @@ router.post('/profile/avatar', authenticate, authorize('PATIENT'), upload.single
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    const publicUrl = await storageService.uploadAvatar(
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype
-    );
+    let publicUrl: string;
+
+    try {
+      publicUrl = await storageService.uploadAvatar(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+    } catch (storageError: any) {
+      // Diagnóstico detalhado do erro do Supabase Storage
+      const storageMsg = storageError?.message || String(storageError);
+      console.error('[AVATAR UPLOAD] Falha no Supabase Storage:', storageMsg);
+
+      // Verificar causa mais comum: bucket inexistente ou sem permissão
+      if (storageMsg.includes('Bucket not found') || storageMsg.includes('not found') || storageMsg.includes('does not exist')) {
+        return res.status(503).json({
+          error: 'Serviço de armazenamento indisponível',
+          details: 'O bucket de avatares não foi encontrado no Supabase. Verifique se o bucket "avatars" existe e está configurado como público.',
+          hint: 'Acesse o painel do Supabase > Storage > Crie o bucket "avatars" com policy pública.'
+        });
+      }
+
+      if (storageMsg.includes('JWT') || storageMsg.includes('Unauthorized') || storageMsg.includes('Invalid API key')) {
+        return res.status(503).json({
+          error: 'Autenticação do storage inválida',
+          details: 'A chave de service role do Supabase pode estar incorreta ou expirada.',
+        });
+      }
+
+      // Erro genérico de storage — retornar detalhes sem expor stack
+      return res.status(503).json({
+        error: 'Falha ao fazer upload da foto',
+        details: storageMsg
+      });
+    }
 
     await prisma.user.update({
       where: { id: req.user?.userId },
@@ -1005,9 +1035,9 @@ router.post('/profile/avatar', authenticate, authorize('PATIENT'), upload.single
     });
 
     res.json({ avatar: publicUrl });
-  } catch (error) {
-    console.error('Erro ao fazer upload de avatar:', error);
-    res.status(500).json({ error: 'Erro ao processar foto' });
+  } catch (error: any) {
+    console.error('[AVATAR UPLOAD] Erro inesperado:', error?.message || error);
+    res.status(500).json({ error: 'Erro interno ao processar foto', details: error?.message });
   }
 });
 

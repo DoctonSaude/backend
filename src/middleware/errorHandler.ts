@@ -215,13 +215,7 @@ export const errorHandler = (err: Error | AppError, req: Request, res: Response,
       }
 
       if (req.path.includes('/notifications')) {
-        return res.json({
-          notifications: [],
-          unreadCount: 0,
-          total: 0,
-          fallback: true,
-          dbError: true
-        });
+        return res.json([]);
       }
 
       if (req.path.includes('/analytics')) {
