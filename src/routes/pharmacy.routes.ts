@@ -385,63 +385,6 @@ router.delete('/promotions/:id', ...pharmacyAuth, async (req, res) => {
   }
 });
 
-// --- Estatísticas de Marketing ---
-router.get('/marketing/stats', ...pharmacyAuth, async (req, res) => {
-  try {
-    const userId = req.user?.userId;
-    const pharmacy = await prisma.pharmacy.findFirst({
-      where: { users: { some: { id: userId } } }
-    });
-
-    if (!pharmacy) return res.status(404).json({ error: 'Farmácia não encontrada' });
-
-    // 1. Total de Promoções Ativas
-    const activePromotions = await prisma.pharmacyPromotion.count({
-      where: {
-        pharmacyId: pharmacy.id,
-        isActive: true,
-        endDate: { gte: new Date() }
-      }
-    });
-
-    // 2. Total de Promoções (todas)
-    const totalPromotions = await prisma.pharmacyPromotion.count({
-      where: { pharmacyId: pharmacy.id }
-    });
-
-    // 3. Visualizações (métricas de VIEW)
-    const views = await prisma.pharmacyMetric.count({
-      where: {
-        pharmacyId: pharmacy.id,
-        type: 'PROMOTION_VIEW'
-      }
-    }).catch(() => 0); // Graceful fallback se tipo não existir
-
-    // 4. Cliques / Conversões
-    const clicks = await prisma.pharmacyMetric.count({
-      where: {
-        pharmacyId: pharmacy.id,
-        type: 'PROMOTION_CLICK'
-      }
-    }).catch(() => 0);
-
-    // 5. Taxa de Conversão
-    const conversionRate = views > 0 ? (clicks / views) * 100 : 0;
-
-    return res.json({
-      activePromotions,
-      totalPromotions,
-      totalViews: views,
-      totalClicks: clicks,
-      conversionRate: Math.round(conversionRate * 10) / 10,
-      period: 'Últimos 30 dias'
-    });
-
-  } catch (error) {
-    console.error('Erro nas estatísticas de marketing:', error);
-    res.status(500).json({ error: 'Erro ao carregar estatísticas de marketing' });
-  }
-});
 
 router.put('/promotions/:id', ...pharmacyAuth, async (req, res) => {
   try {
