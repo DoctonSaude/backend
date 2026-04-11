@@ -93,7 +93,11 @@ router.get('/', async (req, res, next) => {
     try {
       partners = await prisma.partner.findMany({
         where: { isApproved: true },
-        include: {
+        select: {
+          id: true, name: true, type: true, specialty: true, specialties: true,
+          crm: true, description: true, address: true, city: true, state: true,
+          zipCode: true, consultationPrice: true, acceptsOnline: true,
+          isApproved: true, rating: true, totalReviews: true, createdAt: true, updatedAt: true,
           user: { select: { name: true, email: true, avatar: true } },
           services: { where: { isActive: true } }
         },
@@ -105,7 +109,13 @@ router.get('/', async (req, res, next) => {
       console.error('[Partners GET /] Fallback sem services:', innerErr?.message);
       partners = await prisma.partner.findMany({
         where: { isApproved: true },
-        include: { user: { select: { name: true, email: true, avatar: true } } },
+        select: {
+          id: true, name: true, type: true, specialty: true, specialties: true,
+          crm: true, description: true, address: true, city: true, state: true,
+          zipCode: true, consultationPrice: true, acceptsOnline: true,
+          isApproved: true, rating: true, totalReviews: true, createdAt: true, updatedAt: true,
+          user: { select: { name: true, email: true, avatar: true } }
+        },
         orderBy: [
           { createdAt: 'desc' }
         ]
@@ -283,7 +293,11 @@ router.get('/search', async (req, res, next) => {
     try {
       partners = await prisma.partner.findMany({
         where: whereClause,
-        include: {
+        select: {
+          id: true, name: true, type: true, specialty: true, specialties: true,
+          crm: true, description: true, address: true, city: true, state: true,
+          zipCode: true, consultationPrice: true, acceptsOnline: true,
+          isApproved: true, rating: true, totalReviews: true, createdAt: true, updatedAt: true,
           user: { select: { name: true, email: true, avatar: true } },
           services: { where: { isActive: true } }
         },
@@ -295,7 +309,13 @@ router.get('/search', async (req, res, next) => {
       console.error(`[Partners /search] Fallback sem services para "${q}":`, innerErr?.message);
       partners = await prisma.partner.findMany({
         where: whereClause,
-        include: { user: { select: { name: true, email: true, avatar: true } } },
+        select: {
+          id: true, name: true, type: true, specialty: true, specialties: true,
+          crm: true, description: true, address: true, city: true, state: true,
+          zipCode: true, consultationPrice: true, acceptsOnline: true,
+          isApproved: true, rating: true, totalReviews: true, createdAt: true, updatedAt: true,
+          user: { select: { name: true, email: true, avatar: true } }
+        },
         orderBy: [
           { createdAt: 'desc' }
         ]
@@ -322,7 +342,11 @@ router.get('/public-profile', async (req, res) => {
     if (partnerId) {
       const partner = await prisma.partner.findUnique({
         where: { id: partnerId },
-        include: {
+        select: {
+          id: true, name: true, type: true, specialty: true, specialties: true,
+          crm: true, description: true, address: true, city: true, state: true,
+          zipCode: true, consultationPrice: true, acceptsOnline: true,
+          isApproved: true, rating: true, totalReviews: true, createdAt: true, updatedAt: true,
           user: { select: { name: true, avatar: true, email: true } },
           team: true,
           services: {
@@ -365,7 +389,11 @@ router.get('/my-public-profile', authenticate, authorize('PARTNER'), async (req,
     const userId = req.user?.userId;
     const partner = await prisma.partner.findFirst({
       where: { userId },
-      include: {
+      select: {
+        id: true, name: true, type: true, specialty: true, specialties: true,
+        crm: true, description: true, address: true, city: true, state: true,
+        zipCode: true, consultationPrice: true, acceptsOnline: true,
+        isApproved: true, rating: true, totalReviews: true, createdAt: true, updatedAt: true,
         user: { select: { name: true, email: true, avatar: true } },
         team: true,
         services: {

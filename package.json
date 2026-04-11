@@ -1,6 +1,6 @@
 {
-    "name": "docton-backend",
-    "version": "1.0.0",
+    "name": "backend",
+    "version": "1.1.0-stabilized",
     "description": "Docton Saúde Backend API",
     "main": "dist/server.js",
     "scripts": {
