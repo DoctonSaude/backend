@@ -86,7 +86,17 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     try {
-      const user = await UserCrud.findById(tokenUserId);
+      // Busca blindada apenas com campos existentes
+      const user = await prisma.user.findUnique({
+        where: { id: tokenUserId },
+        select: {
+          id: true,
+          role: true,
+          email: true,
+          personId: true,
+          tenantId: true
+        }
+      });
 
       if (!user) {
         logger.error(`[auth] Usuário ${tokenUserId} não encontrado no banco de dados.`, {
