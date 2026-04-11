@@ -37,6 +37,7 @@ export const UserCrud = {
   },
 
   async findByEmail(email: string) {
+    console.log(`!!! V16-ISOLATED-LOGIN-ACTIVE !!! Checking email: ${email}`);
     const prismaUser = await prisma.user.findUnique({
       where: { email },
       select: {
