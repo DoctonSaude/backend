@@ -91,7 +91,6 @@ router.get('/', async (req, res, next) => {
                     services: { where: { isActive: true } }
                 },
                 orderBy: [
-                    { rankingScore: 'desc' },
                     { createdAt: 'desc' }
                 ]
             });
@@ -102,7 +101,6 @@ router.get('/', async (req, res, next) => {
                 where: { isApproved: true },
                 include: { user: { select: { name: true, email: true, avatar: true } } },
                 orderBy: [
-                    { rankingScore: 'desc' },
                     { createdAt: 'desc' }
                 ]
             });
@@ -270,7 +268,6 @@ router.get('/search', async (req, res, next) => {
                     services: { where: { isActive: true } }
                 },
                 orderBy: [
-                    { rankingScore: 'desc' },
                     { createdAt: 'desc' }
                 ]
             });
@@ -281,7 +278,6 @@ router.get('/search', async (req, res, next) => {
                 where: whereClause,
                 include: { user: { select: { name: true, email: true, avatar: true } } },
                 orderBy: [
-                    { rankingScore: 'desc' },
                     { createdAt: 'desc' }
                 ]
             });
