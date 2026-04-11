@@ -129,7 +129,14 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
     if (user.role === 'PARTNER') {
       const partner = user.partner || await prisma.partner.findUnique({ 
         where: { userId: user.id },
-        select: { id: true, isApproved: true, type: true }
+        select: {
+          id: true,
+          userId: true,
+          name: true,
+          specialty: true,
+          isApproved: true,
+          type: true
+        }
       });
       (userWithoutPassword as any).isApproved = partner?.isApproved ?? false;
       (userWithoutPassword as any).partnerType = partner?.type ?? 'INDIVIDUAL';

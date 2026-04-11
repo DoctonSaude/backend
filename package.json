@@ -7,7 +7,7 @@
         "node": ">=20.0.0"
     },
     "scripts": {
-        "build": "rm -rf dist src/generated && npx prisma generate && npx tsc && ls dist/server.js",
+        "build": "rm -rf dist src/generated node_modules/.prisma/client && npx prisma generate && npx tsc && ls dist/server.js",
         "build-id": "echo v18-nuclear-reset-2026-04-11",
         "start": "node dist/server.js",
         "start:simple": "node dist/server-simple.js",
