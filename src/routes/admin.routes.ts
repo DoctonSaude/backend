@@ -4780,7 +4780,7 @@ router.get('/quotes', ...adminAuth, async (req, res) => {
       where: { id: { in: Array.from(planIds) } }
     });
 
-    const planLookup = new Map(plans.map(p => [p.id, p]));
+    const planLookup = new Map<string, any>(plans.map(p => [p.id, p]));
 
     // Map phone -> plan info
     const planMap = new Map();

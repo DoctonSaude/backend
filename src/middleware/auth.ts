@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { getRevokedAt } from '../lib/tokenRevocationStore';
 import { UserCrud } from '../crud/user.crud';
 import { logger } from '../lib/logger';
+import prisma from '../lib/prisma';
 
 interface JwtPayload {
   userId: string;
