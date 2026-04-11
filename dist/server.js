@@ -56,7 +56,7 @@ exports.app.get('/api/nuclear-test-final', (req, res) => {
 exports.app.get('/api/ping', (req, res) => {
     res.status(200).json({
         status: 'ok',
-        version: 'v-reality-check-99',
+        version: 'v8-final-stabilization',
         deployed_at: new Date().toISOString(),
         message: 'Se você está vendo isso, o deploy FUNCIONOU!'
     });
@@ -224,12 +224,12 @@ exports.app.get('/api/health', async (_req, res) => {
         dbUrl: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:([^@]+)@/, ':****@') : 'MISSING',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV,
-        build_id: "v-final-victory-2026-DB-FIXED"
+        build_id: "v8-final-stabilization"
     });
 });
 // --- Diagnóstico Global ---
 exports.app.use((req, res, next) => {
-    res.setHeader('X-Express-Server', 'active-v3-nuclear');
+    res.setHeader('X-Express-Server', 'v8-final-stabilization');
     next();
 });
 exports.app.use(errorHandler_js_1.errorHandler);
@@ -241,7 +241,7 @@ exports.app.use((req, res) => {
         path: req.path,
         method: req.method,
         timestamp: new Date().toISOString(),
-        backend_version: 'v3-nuclear'
+        backend_version: 'v8-final-stabilization'
     });
 });
 let server;

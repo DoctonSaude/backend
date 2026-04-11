@@ -428,7 +428,11 @@ router.get('/analytics/overview', auth_js_1.authenticate, (0, auth_js_1.authoriz
         // Supabase logic removed
         const completed = await prisma_js_1.default.appointment.findMany({
             where: { status: 'COMPLETED' },
-            include: { partner: true },
+            include: {
+                partner: {
+                    select: { id: true, name: true, consultationPrice: true }
+                }
+            },
         });
         const totalRevenue = completed.reduce((sum, apt) => {
             const price = typeof apt.partner?.consultationPrice === 'number' ? apt.partner.consultationPrice : 0;

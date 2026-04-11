@@ -74,7 +74,17 @@ router.get('/patient', authenticate, authorize('PATIENT'), async (req, res) => {
           }
         ]
       },
-      include: { partner: { include: { user: { select: { name: true, avatar: true } } } } },
+      include: { 
+        partner: { 
+          select: { 
+            id: true, 
+            name: true, 
+            rating: true, 
+            address: true,
+            user: { select: { name: true, avatar: true } } 
+          } 
+        } 
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -205,7 +215,11 @@ router.post('/:id/accept', authenticate, authorize('PATIENT'), async (req, res) 
 
     const quote = await prisma.quote.findUnique({
       where: { id },
-      include: { partner: true }
+      include: { 
+        partner: { 
+          select: { id: true, name: true }
+        }
+      }
     });
 
     if (!quote) return res.status(404).json({ error: 'Orçamento não encontrado' });

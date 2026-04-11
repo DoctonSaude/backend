@@ -74,7 +74,17 @@ router.get('/patient', auth_js_1.authenticate, (0, auth_js_1.authorize)('PATIENT
                     }
                 ]
             },
-            include: { partner: { include: { user: { select: { name: true, avatar: true } } } } },
+            include: {
+                partner: {
+                    select: {
+                        id: true,
+                        name: true,
+                        rating: true,
+                        address: true,
+                        user: { select: { name: true, avatar: true } }
+                    }
+                }
+            },
             orderBy: { createdAt: 'desc' }
         });
         // Auto-link orphans found by phone
@@ -197,7 +207,11 @@ router.post('/:id/accept', auth_js_1.authenticate, (0, auth_js_1.authorize)('PAT
             return res.status(404).json({ error: 'Paciente não encontrado' });
         const quote = await prisma_js_1.default.quote.findUnique({
             where: { id },
-            include: { partner: true }
+            include: {
+                partner: {
+                    select: { id: true, name: true }
+                }
+            }
         });
         if (!quote)
             return res.status(404).json({ error: 'Orçamento não encontrado' });
