@@ -39,7 +39,13 @@ export const UserCrud = {
             totalReviews: true
           }
         },
-        pharmacy: true,
+        pharmacy: {
+          select: {
+            id: true,
+            name: true,
+            isApproved: true
+          }
+        },
         patient: {
           include: {
             subscriptions: {

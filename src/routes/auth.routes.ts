@@ -127,14 +127,20 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
 
     // Anexar status de aprovação e tipo de parceiro
     if (user.role === 'PARTNER') {
-      const partner = user.partner || await prisma.partner.findUnique({ where: { userId: user.id } });
+      const partner = user.partner || await prisma.partner.findUnique({ 
+        where: { userId: user.id },
+        select: { id: true, isApproved: true, type: true }
+      });
       (userWithoutPassword as any).isApproved = partner?.isApproved ?? false;
       (userWithoutPassword as any).partnerType = partner?.type ?? 'INDIVIDUAL';
     }
 
     // Anexar status de aprovação de farmácia
     if (user.role === 'PHARMACY') {
-      const pharmacy = user.pharmacy || await prisma.pharmacy.findFirst({ where: { users: { some: { id: user.id } } } });
+      const pharmacy = user.pharmacy || await prisma.pharmacy.findFirst({ 
+        where: { users: { some: { id: user.id } } },
+        select: { id: true, isApproved: true, name: true }
+      });
       (userWithoutPassword as any).isApproved = pharmacy?.isApproved ?? false;
       (userWithoutPassword as any).pharmacyName = pharmacy?.name ?? '';
     }
@@ -175,8 +181,12 @@ router.get('/validate', async (req: Request, res: Response, next: NextFunction) 
         const user = await prisma.user.findUnique({
           where: { id: userId },
           include: {
-            partner: true,
-            pharmacy: true,
+            partner: {
+              select: { id: true, isApproved: true, type: true }
+            },
+            pharmacy: {
+              select: { id: true, isApproved: true, name: true }
+            },
             patient: {
               include: {
                 subscriptions: {
