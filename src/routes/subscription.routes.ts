@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { authenticate, authorize } from '../middleware/auth.js';
-import prisma from '../lib/prisma.js';
-import inAppNotificationService from '../services/inAppNotification.service.js';
+import { authenticate, authorize } from '../middleware/auth';
+import prisma from '../lib/prisma';
+import inAppNotificationService from '../services/inAppNotification.service';
 
 const router = Router();
 

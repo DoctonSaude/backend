@@ -1,43 +1,43 @@
 import { Router } from 'express';
 
 // --- Route imports ---
-import authRoutes from './auth.routes.js';
-import patientRoutes from './patient.routes.js';
-import partnerRoutes from './partner.routes.js';
-import adminRoutes from './admin.routes.js';
-import gamificationRoutes from './gamification.routes.js';
-import loyaltyRoutes from './loyalty.routes.js';
-import notificationsRoutes from './notifications.routes.js';
-import churnPreventionRoutes from './churn-prevention.js';
-import npsRoutes from './nps-feedback.js';
-import recommendationsRoutes from './recommendations.js';
-import quotesRoutes from './quotes.routes.js';
-import analyticsRoutes from './analytics.routes.js';
-import financialRoutes from './financial.routes.js';
-import transfersRoutes from './transfers.routes.js';
-import plansRoutes from './plans.routes.js';
-import pricesRoutes from './prices.routes.js';
-import supportRoutes from './support.routes.js';
-import knowledgeRoutes from './knowledge.routes.js';
-import faqRoutes from './faq.routes.js';
-import auditRoutes from './audit.routes.js';
-import permissionRoutes from './permission.routes.js';
-import reportsRoutes from './reports.routes.js';
-import medicalRoutes from './medical.routes.js';
-import telemedicineRoutes from './telemedicine.routes.js';
-import categoriesRoutes from './categories.routes.js';
-import ocrRoutes from './ocr.routes.js';
-import quotePaymentsRoutes from './quote-payments.routes.js';
-import healthToolRoutes from './healthTool.routes.js';
-import pharmacyRoutes from './pharmacy.routes.js'; // NOVO: Farmácia Pro 2.0
-import subscriptionRoutes from './subscription.routes.js'; // NOVO: Motor de Recorrência
-import familyRoutes from './family.routes.js'; // NOVO: Gestão Familiar (Onda 2)
-import timelineRoutes from './timeline.routes.js'; // NOVO: Timeline de Saúde (Onda 3)
-import growthRoutes from './growth.routes.js';
-import partnerProfileRoutes from './partner/profile.routes.js';
-import partnerFinanceRoutes from './partner/finance.routes.js';
-import partnerManagementRoutes from './partner/management.routes.js';
-// import chatRoutes from './chat.routes.js';
+import authRoutes from './auth.routes';
+import patientRoutes from './patient.routes';
+import partnerRoutes from './partner.routes';
+import adminRoutes from './admin.routes';
+import gamificationRoutes from './gamification.routes';
+import loyaltyRoutes from './loyalty.routes';
+import notificationsRoutes from './notifications.routes';
+import churnPreventionRoutes from './churn-prevention';
+import npsRoutes from './nps-feedback';
+import recommendationsRoutes from './recommendations';
+import quotesRoutes from './quotes.routes';
+import analyticsRoutes from './analytics.routes';
+import financialRoutes from './financial.routes';
+import transfersRoutes from './transfers.routes';
+import plansRoutes from './plans.routes';
+import pricesRoutes from './prices.routes';
+import supportRoutes from './support.routes';
+import knowledgeRoutes from './knowledge.routes';
+import faqRoutes from './faq.routes';
+import auditRoutes from './audit.routes';
+import permissionRoutes from './permission.routes';
+import reportsRoutes from './reports.routes';
+import medicalRoutes from './medical.routes';
+import telemedicineRoutes from './telemedicine.routes';
+import categoriesRoutes from './categories.routes';
+import ocrRoutes from './ocr.routes';
+import quotePaymentsRoutes from './quote-payments.routes';
+import healthToolRoutes from './healthTool.routes';
+import pharmacyRoutes from './pharmacy.routes'; // NOVO: Farmácia Pro 2.0
+import subscriptionRoutes from './subscription.routes'; // NOVO: Motor de Recorrência
+import familyRoutes from './family.routes'; // NOVO: Gestão Familiar (Onda 2)
+import timelineRoutes from './timeline.routes'; // NOVO: Timeline de Saúde (Onda 3)
+import growthRoutes from './growth.routes';
+import partnerProfileRoutes from './partner/profile.routes';
+import partnerFinanceRoutes from './partner/finance.routes';
+import partnerManagementRoutes from './partner/management.routes';
+// import chatRoutes from './chat.routes';
 
 const router = Router();
 console.log('[API] Registrando rotas de Timeline (Prioridade Máxima)...');

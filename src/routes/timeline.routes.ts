@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { authenticate, authorize } from '../middleware/auth.js';
-import { patientService } from '../services/patient.service.js';
-import { logger } from '../lib/logger.js';
-import prisma from '../lib/prisma.js';
+import { authenticate, authorize } from '../middleware/auth';
+import { patientService } from '../services/patient.service';
+import { logger } from '../lib/logger';
+import prisma from '../lib/prisma';
 
 const router = Router();
 
