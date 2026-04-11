@@ -1,0 +1,1 @@
+{"version":3,"file":"clinical-risk.service.d.ts","sourceRoot":"","sources":["../../src/services/clinical-risk.service.ts"],"names":[],"mappings":"AAIA,qBAAa,mBAAmB;IAC5B;;OAEG;WACU,qBAAqB,CAAC,SAAS,EAAE,MAAM,GAAG,OAAO,CAAC,MAAM,CAAC;IAgDtE;;OAEG;WACU,eAAe,CAAC,SAAS,EAAE,MAAM,EAAE,SAAS,EAAE,MAAM;IAejE;;OAEG;WACU,iBAAiB,CAAC,SAAS,EAAE,MAAM,EAAE,SAAS,EAAE,MAAM;CAKtE"}

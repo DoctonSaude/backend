@@ -1,0 +1,1293 @@
+﻿[
+  {
+    "id": "f5b99be8-5414-4c4d-9168-79605b936f1c",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T02:20:51.372Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "20d54323-b40c-4b75-b35c-c87b00dc374f",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T02:19:56.878Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "9db83fe2-d0f8-4d1a-a6a9-970c5deffd03",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T02:09:53.883Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "c88ba908-c066-4209-b061-2e74de96e3a5",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:51:11.643Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "764b88ea-b114-4c48-bbdf-d31a6e1e0161",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:46:46.377Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "ignoreWatchPatterns": true,
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "redeploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "skipBuildCache": true,
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "a4b87451-c3a9-4f5b-bd3d-62a6480c4cf4",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:45:58.386Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "74608f22-306c-47c7-af84-9cf69394e570",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:45:21.348Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "a4292362-4801-4b39-981f-379233042265",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:42:43.520Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "10ca028a-5a93-4908-bcf5-cc4c7fa4ddda",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:37:40.019Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "051fe59f-721d-420c-b1cc-24a3c5f06650",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:31:20.449Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "2c0ff418-37d6-47cc-80c5-5437d5338f15",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:27:00.820Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "2ddb272b-486f-493f-836b-0d5a9a118a5f",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:26:46.851Z",
+    "meta": {
+      "branch": "cleanup/secrets",
+      "buildOnly": false,
+      "commitAuthor": "DoctonSaude",
+      "commitHash": "8f3052511a653a24d5ff25497bdd86d8fe090bc8",
+      "commitMessage": "fix(backend): corrigir erros cr├¡ticos no Chat, Registro e Cliente Supabase v1.0.6",
+      "fileServiceManifest": {},
+      "ignoreWatchPatterns": true,
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "patchId": "a6ec2b1d-485a-4cee-8ef7-f97facccf12d",
+      "plan": "hobby",
+      "propertyFileMapping": {},
+      "reason": "deploy",
+      "repo": "DoctonSaude/Docton-",
+      "rootDirectory": "",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "19b2dad9-19ab-441b-b591-07c1fef16168",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:21:18.632Z",
+    "meta": {
+      "buildOnly": false,
+      "configErrors": [
+        "Could not find root directory: /backend"
+      ],
+      "logsV2": true,
+      "reason": "deploy",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "bed36f3a-8784-40bb-8ff1-af03e556672e",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:18:25.006Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "backend/railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "/backend",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "94a92141-9f7d-42f8-8037-89b569aa3028",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:07:52.099Z",
+    "meta": {
+      "buildOnly": false,
+      "configFile": "backend/railway.toml",
+      "fileServiceManifest": {
+        "build": {
+          "builder": "DOCKERFILE"
+        },
+        "deploy": {
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "startCommand": "sh ./start.sh"
+        }
+      },
+      "logsV2": true,
+      "nixpacksProviders": [
+        "node"
+      ],
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType",
+        "deploy.startCommand": "$.deploy.startCommand"
+      },
+      "reason": "deploy",
+      "rootDirectory": "/backend",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "backend/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "b478f67c-853d-403b-8c99-743bd4d450e8",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T01:01:47.524Z",
+    "meta": {
+      "buildOnly": false,
+      "configErrors": [
+        "Could not find root directory: /backend"
+      ],
+      "logsV2": true,
+      "reason": "deploy",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "7be49389-0cd1-4131-aac0-8f9aed9e66ce",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T00:51:06.314Z",
+    "meta": {
+      "buildOnly": false,
+      "configErrors": [
+        "Could not find root directory: /backend"
+      ],
+      "logsV2": true,
+      "reason": "deploy",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "83249f4d-d136-46f5-8db1-2052c9889478",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T00:49:11.303Z",
+    "meta": {
+      "buildOnly": false,
+      "configErrors": [
+        "Could not find root directory: /backend"
+      ],
+      "logsV2": true,
+      "reason": "deploy",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "54d0effa-5ecb-401d-8969-65e6b38ec5dd",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T00:41:29.829Z",
+    "meta": {
+      "buildOnly": false,
+      "configErrors": [
+        "Could not find root directory: /backend"
+      ],
+      "logsV2": true,
+      "reason": "deploy",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  },
+  {
+    "id": "a50a4b1f-9053-4fd4-8d2b-a1b639e8486e",
+    "status": "FAILED",
+    "createdAt": "2026-04-11T00:27:40.149Z",
+    "meta": {
+      "buildOnly": false,
+      "configErrors": [
+        "Could not find root directory: /backend"
+      ],
+      "logsV2": true,
+      "reason": "deploy",
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": "npm run build",
+          "buildEnvironment": null,
+          "builder": "RAILPACK",
+          "dockerfilePath": null,
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": 0,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "europe-west4-drams3a": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": 0,
+          "preDeployCommand": [],
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": "sh ./start.sh",
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": []
+    }
+  }
+]

@@ -277,12 +277,13 @@ class APIGateway {
 
     // 2. Gestão e Operações (Monolito - Porta 3001)
     // Agindo como fallback: QUALQUER outra rota enviada para /api/pharmacy vai para o Monolito
-    this.app.use('/api/pharmacy', this.createServiceProxy('monolith', [
+    this.app.use('/api', this.createServiceProxy('monolith', [
       'GET *',
       'POST *',
       'PUT *',
       'DELETE *',
-      'PATCH *'
+      'PATCH *',
+      'OPTIONS *'
     ]))
 
     // Payments service routes

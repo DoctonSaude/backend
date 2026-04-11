@@ -1,5 +1,7 @@
 # Ignore files that should not be uploaded to Railway
 node_modules/
+# dist/
+# lib/
 *.log
 *.env.development
 *.env.local

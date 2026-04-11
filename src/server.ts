@@ -16,6 +16,10 @@ export const app = express();
 app.set('trust proxy', 1);
 
 // Endpoint de Diagnóstico de Choque (Reality Check)
+app.get('/api/nuclear-test-final', (req, res) => {
+  res.send('YES-BOSS-ACTIVE');
+});
+
 app.get('/api/ping', (req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -207,7 +211,7 @@ app.get('/api/health', async (_req, res) => {
     db: dbStatus,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    build_id: "v-nuclear-final-BOSS"
+    build_id: "v-victory-FINAL-2026-838852177"
   });
 });
 
