@@ -10,6 +10,9 @@ import 'dotenv/config';
 };
 
 import express, { Request, Response, NextFunction } from 'express';
+console.log('!!! SERVER BOOT V18 - NUCLEAR STABILIZATION ACTIVE !!!');
+console.log('!!! CACHE CLEARED - DISMISSING ZOMBIE VERSIONS !!!');
+
 export const app = express();
 
 // Trust proxy para Railway/produção (necessário para rate-limit com X-Forwarded-For)
