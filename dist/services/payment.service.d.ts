@@ -8,8 +8,8 @@ export declare class PaymentService {
         updatedAt: Date;
         status: string;
         expiresAt: Date;
-        appointmentId: string;
         amount: number;
+        appointmentId: string;
         pixQrCode: string | null;
         pixCopyPaste: string | null;
         txId: string | null;
@@ -24,8 +24,8 @@ export declare class PaymentService {
         updatedAt: Date;
         status: string;
         expiresAt: Date;
-        appointmentId: string;
         amount: number;
+        appointmentId: string;
         pixQrCode: string | null;
         pixCopyPaste: string | null;
         txId: string | null;

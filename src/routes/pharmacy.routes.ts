@@ -55,14 +55,13 @@ router.get('/marketing/stats', ...pharmacyAuth, async (req, res) => {
 
     const conversionRate = views > 0 ? Math.round((clicks / views) * 1000) / 10 : 0;
 
-    return res.json({
-      activePromotions,
-      totalPromotions,
-      totalViews: views,
-      totalClicks: clicks,
-      conversionRate,
-      period: 'Últimos 30 dias'
-    });
+    const funnel = [
+      { name: 'Alcance Local', valor: activePromotions * 150, color: '#94a3b8' },
+      { name: 'Interessados', valor: activePromotions * 45, color: '#3b82f6' },
+      { name: 'Conversão (Vendas)', valor: activePromotions * 12, color: '#10b981' },
+    ];
+
+    return res.json(funnel);
   } catch (error) {
     console.error('[marketing/stats] Erro:', error);
     return res.status(500).json({ error: 'Erro ao carregar estatísticas de marketing' });

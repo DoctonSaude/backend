@@ -21,33 +21,15 @@ export declare class FinanceService {
      * Retorna estatísticas financeiras detalhadas para o dashboard do parceiro.
      */
     getWalletStats(partnerId: string): Promise<{
-        balance: number;
-        pendingBalance: number;
-        totalRevenue: number;
-        transactions: {
-            id: string;
-            type: string;
-            description: string | null;
-            createdAt: Date;
-            status: string;
-            partnerId: string;
-            appointmentId: string | null;
-            amount: number;
-            availableAt: Date | null;
-        }[];
+        balance: any;
+        pendingBalance: any;
+        totalRevenue: any;
+        transactions: any;
     }>;
     /**
      * Solicita um saque do saldo disponível.
      */
-    requestPayout(partnerId: string, amount: number, bankDetails: any): Promise<{
-        id: string;
-        createdAt: Date;
-        status: string;
-        partnerId: string;
-        amount: number;
-        bankDetails: import("@prisma/client/runtime/library.js").JsonValue | null;
-        processedAt: Date | null;
-    }>;
+    requestPayout(partnerId: string, amount: number, bankDetails: any): Promise<any>;
 }
 export declare const financeService: FinanceService;
 //# sourceMappingURL=finance.service.d.ts.map

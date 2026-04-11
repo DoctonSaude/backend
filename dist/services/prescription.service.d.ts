@@ -29,11 +29,6 @@ export declare class PrescriptionService {
         sideEffects: string | null;
         contraindications: string | null;
         validUntil: Date | null;
-        appointmentId: string | null;
-        content: string | null;
-        signature: string | null;
-        signedAt: Date | null;
-        isDigital: boolean;
     }>;
     /**
      * Assina digitalmente a receita (MOCK ICP-Brasil simulado)
@@ -60,32 +55,11 @@ export declare class PrescriptionService {
         sideEffects: string | null;
         contraindications: string | null;
         validUntil: Date | null;
-        appointmentId: string | null;
-        content: string | null;
-        signature: string | null;
-        signedAt: Date | null;
-        isDigital: boolean;
     }>;
     /**
      * Busca prescrições emitidas por um parceiro
      */
-    getPrescriptionsByPartner(partnerId: string): Promise<({
-        patient: {
-            id: string;
-            person: {
-                name: string;
-                avatar: string;
-            };
-            user: {
-                name: string;
-                avatar: string;
-            };
-        };
-        appointment: {
-            id: string;
-            dateTime: Date;
-        };
-    } & {
+    getPrescriptionsByPartner(partnerId: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -107,12 +81,7 @@ export declare class PrescriptionService {
         sideEffects: string | null;
         contraindications: string | null;
         validUntil: Date | null;
-        appointmentId: string | null;
-        content: string | null;
-        signature: string | null;
-        signedAt: Date | null;
-        isDigital: boolean;
-    })[]>;
+    }[]>;
 }
 export declare const prescriptionService: PrescriptionService;
 //# sourceMappingURL=prescription.service.d.ts.map

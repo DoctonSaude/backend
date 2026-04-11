@@ -86,22 +86,14 @@ export declare class MedicalRecordService {
             languages: string[];
             settings: import("@prisma/client/runtime/library.js").JsonValue | null;
             workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-            planTier: string;
-            planStatus: string;
-            planExpiresAt: Date | null;
-            happyHourConfig: import("@prisma/client/runtime/library.js").JsonValue | null;
             createdAt: Date;
             updatedAt: Date;
-            rankingScore: number;
-            totalImpressions: number;
-            totalClicks: number;
         };
         appointment: {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: string;
-            commissionPercent: number | null;
             patientId: string;
             duration: number | null;
             notes: string | null;
@@ -112,11 +104,6 @@ export declare class MedicalRecordService {
             roomId: string | null;
             equipmentId: string | null;
             professionalId: string | null;
-            doctonFee: number | null;
-            partnerNetPrice: number | null;
-            availableAt: Date | null;
-            payoutStatus: string | null;
-            serviceId: string | null;
         };
     } & {
         id: string;

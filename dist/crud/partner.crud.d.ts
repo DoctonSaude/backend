@@ -40,15 +40,8 @@ export declare const PartnerCrud: {
         languages: string[];
         settings: Prisma.JsonValue | null;
         workingHours: Prisma.JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     findById(id: string): Promise<{
         id: string;
@@ -90,15 +83,8 @@ export declare const PartnerCrud: {
         languages: string[];
         settings: Prisma.JsonValue | null;
         workingHours: Prisma.JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     findByUserId(userId: string): Promise<{
         id: string;
@@ -140,15 +126,8 @@ export declare const PartnerCrud: {
         languages: string[];
         settings: Prisma.JsonValue | null;
         workingHours: Prisma.JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     update(id: string, data: any): Promise<{
         id: string;
@@ -190,15 +169,8 @@ export declare const PartnerCrud: {
         languages: string[];
         settings: Prisma.JsonValue | null;
         workingHours: Prisma.JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     delete(id: string): Promise<{
         id: string;
@@ -240,15 +212,8 @@ export declare const PartnerCrud: {
         languages: string[];
         settings: Prisma.JsonValue | null;
         workingHours: Prisma.JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     list(): Promise<{
         id: string;
@@ -290,15 +255,8 @@ export declare const PartnerCrud: {
         languages: string[];
         settings: Prisma.JsonValue | null;
         workingHours: Prisma.JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }[]>;
 };
 //# sourceMappingURL=partner.crud.d.ts.map

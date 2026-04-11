@@ -4,7 +4,6 @@ export declare const AppointmentCrud: {
         createdAt: Date;
         updatedAt: Date;
         status: string;
-        commissionPercent: number | null;
         patientId: string;
         duration: number | null;
         notes: string | null;
@@ -15,18 +14,12 @@ export declare const AppointmentCrud: {
         roomId: string | null;
         equipmentId: string | null;
         professionalId: string | null;
-        doctonFee: number | null;
-        partnerNetPrice: number | null;
-        availableAt: Date | null;
-        payoutStatus: string | null;
-        serviceId: string | null;
     }>;
     findById(id: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         status: string;
-        commissionPercent: number | null;
         patientId: string;
         duration: number | null;
         notes: string | null;
@@ -37,18 +30,12 @@ export declare const AppointmentCrud: {
         roomId: string | null;
         equipmentId: string | null;
         professionalId: string | null;
-        doctonFee: number | null;
-        partnerNetPrice: number | null;
-        availableAt: Date | null;
-        payoutStatus: string | null;
-        serviceId: string | null;
     }>;
     update(id: string, data: any): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         status: string;
-        commissionPercent: number | null;
         patientId: string;
         duration: number | null;
         notes: string | null;
@@ -59,18 +46,12 @@ export declare const AppointmentCrud: {
         roomId: string | null;
         equipmentId: string | null;
         professionalId: string | null;
-        doctonFee: number | null;
-        partnerNetPrice: number | null;
-        availableAt: Date | null;
-        payoutStatus: string | null;
-        serviceId: string | null;
     }>;
     delete(id: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         status: string;
-        commissionPercent: number | null;
         patientId: string;
         duration: number | null;
         notes: string | null;
@@ -81,18 +62,12 @@ export declare const AppointmentCrud: {
         roomId: string | null;
         equipmentId: string | null;
         professionalId: string | null;
-        doctonFee: number | null;
-        partnerNetPrice: number | null;
-        availableAt: Date | null;
-        payoutStatus: string | null;
-        serviceId: string | null;
     }>;
     list(): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         status: string;
-        commissionPercent: number | null;
         patientId: string;
         duration: number | null;
         notes: string | null;
@@ -103,11 +78,6 @@ export declare const AppointmentCrud: {
         roomId: string | null;
         equipmentId: string | null;
         professionalId: string | null;
-        doctonFee: number | null;
-        partnerNetPrice: number | null;
-        availableAt: Date | null;
-        payoutStatus: string | null;
-        serviceId: string | null;
     }[]>;
 };
 //# sourceMappingURL=appointment.crud.d.ts.map

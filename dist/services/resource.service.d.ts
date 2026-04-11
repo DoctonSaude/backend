@@ -37,7 +37,6 @@ export declare class ResourceService {
         status: string;
         isActive: boolean;
         partnerId: string;
-        useCount: number;
     }>;
 }
 export declare const resourceService: ResourceService;

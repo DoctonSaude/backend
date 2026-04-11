@@ -43,55 +43,26 @@ export declare class VisibilityService {
         languages: string[];
         settings: import("@prisma/client/runtime/library.js").JsonValue | null;
         workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: import("@prisma/client/runtime/library.js").JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     /**
      * Ativa um boost para um parceiro.
      */
-    activateBoost(partnerId: string, type: string, price: number, config?: any, durationDays?: number): Promise<{
-        id: string;
-        type: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: string;
-        expiresAt: Date | null;
-        price: number;
-        partnerId: string;
-        config: import("@prisma/client/runtime/library.js").JsonValue | null;
-    }>;
+    activateBoost(partnerId: string, type: string, price: number, config?: any, durationDays?: number): Promise<any>;
     /**
      * Retorna estatísticas de visibilidade para o dashboard do parceiro.
      */
     getGrowthStats(partnerId: string): Promise<{
-        rankingScore: string;
+        rankingScore: any;
         rankingPosition: number;
-        totalImpressions: number;
-        totalClicks: number;
+        totalImpressions: any;
+        totalClicks: any;
         estimatedLoss: number;
         specialty: string;
         totalAppointments: number;
-        activeBoosts: {
-            id: string;
-            type: string;
-            expiresAt: Date;
-            price: number;
-        }[];
-        boostHistory: {
-            id: string;
-            type: string;
-            status: string;
-            expiresAt: Date;
-            price: number;
-            createdAt: Date;
-        }[];
+        activeBoosts: any;
+        boostHistory: any;
         conversionRate: string;
     }>;
     /**
@@ -137,15 +108,8 @@ export declare class VisibilityService {
         languages: string[];
         settings: import("@prisma/client/runtime/library.js").JsonValue | null;
         workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: import("@prisma/client/runtime/library.js").JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     /**
      * Registra um clique (acesso ao perfil)
@@ -190,15 +154,8 @@ export declare class VisibilityService {
         languages: string[];
         settings: import("@prisma/client/runtime/library.js").JsonValue | null;
         workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: import("@prisma/client/runtime/library.js").JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
 }
 export declare const visibilityService: VisibilityService;

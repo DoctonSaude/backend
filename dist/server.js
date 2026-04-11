@@ -221,9 +221,10 @@ exports.app.get('/api/health', async (_req, res) => {
     res.json({
         status: 'ok',
         db: dbStatus,
+        dbUrl: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:([^@]+)@/, ':****@') : 'MISSING',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV,
-        build_id: "v-victory-FINAL-2026-838852177"
+        build_id: "v-final-victory-2026-DB-FIXED"
     });
 });
 // --- Diagnóstico Global ---

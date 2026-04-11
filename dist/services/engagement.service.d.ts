@@ -140,15 +140,8 @@ export declare class EngagementService {
         languages: string[];
         settings: import("@prisma/client/runtime/library.js").JsonValue | null;
         workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        planTier: string;
-        planStatus: string;
-        planExpiresAt: Date | null;
-        happyHourConfig: import("@prisma/client/runtime/library.js").JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
-        rankingScore: number;
-        totalImpressions: number;
-        totalClicks: number;
     }>;
     /**
      * Proxies to inAppNotification.service's createNotification
