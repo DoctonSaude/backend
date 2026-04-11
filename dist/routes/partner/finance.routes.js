@@ -19,7 +19,7 @@ router.get('/dashboard', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTN
         const userId = req.user.userId || req.user.id;
         const partner = await prisma_js_1.default.partner.findFirst({
             where: { userId },
-            select: { id: true, rating: true, totalReviews: true, planTier: true, planStatus: true, createdAt: true }
+            select: { id: true, rating: true, totalReviews: true, createdAt: true }
         });
         if (!partner)
             return res.status(404).json({ error: 'Parceiro não encontrado' });
@@ -33,11 +33,11 @@ router.get('/dashboard', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTN
             prisma_js_1.default.appointment.count({ where: { partnerId: partner.id, status: { in: ['SCHEDULED', 'CONFIRMED'] } } }),
             prisma_js_1.default.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: startOfMonth } } }),
             prisma_js_1.default.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: lastMonthStart, lte: lastMonthEnd } } }),
-            prisma_js_1.default.partnerTransaction.aggregate({
+            prisma_js_1.default.transaction.aggregate({
                 where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: startOfMonth } },
                 _sum: { amount: true }
             }),
-            prisma_js_1.default.partnerTransaction.aggregate({
+            prisma_js_1.default.transaction.aggregate({
                 where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
                 _sum: { amount: true }
             }),
@@ -66,7 +66,7 @@ router.get('/dashboard', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTN
             chartStartDate.setDate(chartStartDate.getDate() - 29);
         chartStartDate.setHours(0, 0, 0, 0);
         const [dailyRevenue, dailyAppts] = await Promise.all([
-            prisma_js_1.default.partnerTransaction.findMany({
+            prisma_js_1.default.transaction.findMany({
                 where: { partnerId: partner.id, status: 'COMPLETED', type: 'CREDIT', createdAt: { gte: chartStartDate } },
                 select: { amount: true, createdAt: true }
             }),
@@ -97,9 +97,7 @@ router.get('/dashboard', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTN
                 apptsGrowth: Math.round(apptsGrowth),
                 upcomingAppointments,
                 rating: partner.rating || 0,
-                totalReviews: partner.totalReviews || 0,
-                planTier: partner.planTier,
-                planStatus: partner.planStatus
+                totalReviews: partner.totalReviews || 0
             },
             recentAppointments: recentAppointments.map(appt => ({
                 id: appt.id,

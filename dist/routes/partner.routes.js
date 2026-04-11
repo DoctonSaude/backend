@@ -75,8 +75,6 @@ const mapPartnerData = (p) => {
         isApproved: p.isApproved,
         rating: p.rating || 0,
         totalReviews: p.totalReviews || 0,
-        planTier: p.planTier || 'FREE',
-        planStatus: p.planStatus || 'ACTIVE',
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
     };
@@ -126,7 +124,7 @@ router.get('/dashboard', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTN
         const userId = req.user.userId || req.user.id;
         const partner = await prisma_js_1.default.partner.findFirst({
             where: { userId },
-            select: { id: true, rating: true, totalReviews: true, planTier: true, planStatus: true, createdAt: true }
+            select: { id: true, rating: true, totalReviews: true, createdAt: true }
         });
         if (!partner)
             return res.status(404).json({ error: 'Parceiro não encontrado' });
@@ -204,9 +202,7 @@ router.get('/dashboard', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTN
                 apptsGrowth: Math.round(apptsGrowth),
                 upcomingAppointments,
                 rating: partner.rating || 0,
-                totalReviews: partner.totalReviews || 0,
-                planTier: partner.planTier,
-                planStatus: partner.planStatus
+                totalReviews: partner.totalReviews || 0
             },
             recentAppointments: recentAppointments.map(appt => ({
                 id: appt.id,
@@ -542,8 +538,6 @@ router.get('/profile', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTNER
                 isApproved: partner.isApproved,
                 rating: partner.rating || 0,
                 totalReviews: partner.totalReviews || 0,
-                planTier: partner.planTier || 'FREE',
-                planStatus: partner.planStatus || 'ACTIVE',
                 createdAt: partner.createdAt,
                 updatedAt: partner.updatedAt,
             });
@@ -630,25 +624,18 @@ router.put('/settings', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTNE
 // Update Partner Plan
 router.put('/plan', auth_js_1.authenticate, (0, auth_js_1.authorize)('PARTNER'), async (req, res) => {
     try {
-        const { planTier } = req.body;
         const userId = req.user?.userId;
-        if (!['FREE', 'PRO', 'PREMIUM'].includes(planTier)) {
-            return res.status(400).json({ error: 'Plano inválido' });
-        }
         const partner = await prisma_js_1.default.partner.findUnique({ where: { userId } });
         if (!partner)
             return res.status(404).json({ error: 'Parceiro não encontrado' });
         const updated = await prisma_js_1.default.partner.update({
             where: { id: partner.id },
             data: {
-                planTier,
-                planStatus: 'ACTIVE' // Simplified for now
+            // Updated logic: plan fields removed
             }
         });
         res.json({
-            success: true,
-            planTier: updated.planTier,
-            planStatus: updated.planStatus
+            success: true
         });
     }
     catch (error) {

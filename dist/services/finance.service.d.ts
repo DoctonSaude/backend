@@ -1,16 +1,17 @@
 export declare class FinanceService {
     /**
      * Calcula as taxas e o valor líquido do parceiro.
-     * Prioridade: Taxa customizada nos Dados Financeiros > Plano (PREMIUM 5%, PRO 10%, FREE 15%)
+     * Padrão 15% de taxa de plataforma.
      */
-    calculateFees(amount: number, partnerId: string, planTier?: string): Promise<{
+    calculateFees(amount: number, partnerId: string): Promise<{
         commissionPercent: number;
         doctonFee: number;
         partnerNetPrice: number;
     }>;
     /**
      * Registra a conclusão de um agendamento e atualiza o financeiro do parceiro.
-     * Agora busca o preço dinamicamente do serviço vinculado.
+     * Nota: Campos financeiros removidos do modelo Appointment no schema atual.
+     * Apenas registramos o fato na tabela Transaction.
      */
     processAppointmentCompletion(appointmentId: string): Promise<{
         commissionPercent: number;
@@ -18,18 +19,54 @@ export declare class FinanceService {
         partnerNetPrice: number;
     }>;
     /**
-     * Retorna estatísticas financeiras detalhadas para o dashboard do parceiro.
+     * Retorna estatísticas financeiras usando o modelo Transaction.
      */
     getWalletStats(partnerId: string): Promise<{
-        balance: any;
-        pendingBalance: any;
-        totalRevenue: any;
-        transactions: any;
+        balance: number;
+        pendingBalance: number;
+        totalRevenue: number;
+        transactions: {
+            id: string;
+            type: string;
+            description: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: string;
+            date: Date;
+            category: string | null;
+            patientId: string | null;
+            partnerId: string | null;
+            metadata: string | null;
+            metadataJson: import("@prisma/client/runtime/library.js").JsonValue | null;
+            amount: number;
+            client: string | null;
+            dueDate: Date | null;
+            paymentDate: Date | null;
+            dreCategory: string | null;
+        }[];
     }>;
     /**
      * Solicita um saque do saldo disponível.
      */
-    requestPayout(partnerId: string, amount: number, bankDetails: any): Promise<any>;
+    requestPayout(partnerId: string, amount: number): Promise<{
+        id: string;
+        type: string;
+        description: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: string;
+        date: Date;
+        category: string | null;
+        patientId: string | null;
+        partnerId: string | null;
+        metadata: string | null;
+        metadataJson: import("@prisma/client/runtime/library.js").JsonValue | null;
+        amount: number;
+        client: string | null;
+        dueDate: Date | null;
+        paymentDate: Date | null;
+        dreCategory: string | null;
+    }>;
 }
 export declare const financeService: FinanceService;
 //# sourceMappingURL=finance.service.d.ts.map

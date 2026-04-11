@@ -16,7 +16,7 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req: any, re
     const userId = req.user.userId || req.user.id;
     const partner = await prisma.partner.findFirst({
       where: { userId },
-      select: { id: true, rating: true, totalReviews: true, planTier: true, planStatus: true, createdAt: true }
+      select: { id: true, rating: true, totalReviews: true, createdAt: true }
     });
 
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
@@ -42,11 +42,11 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req: any, re
       prisma.appointment.count({ where: { partnerId: partner.id, status: { in: ['SCHEDULED', 'CONFIRMED'] } } }),
       prisma.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: startOfMonth } } }),
       prisma.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: lastMonthStart, lte: lastMonthEnd } } }),
-      prisma.partnerTransaction.aggregate({
+      prisma.transaction.aggregate({
         where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: startOfMonth } },
         _sum: { amount: true }
       }),
-      prisma.partnerTransaction.aggregate({
+      prisma.transaction.aggregate({
         where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
         _sum: { amount: true }
       }),
@@ -76,7 +76,7 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req: any, re
     chartStartDate.setHours(0, 0, 0, 0);
 
     const [dailyRevenue, dailyAppts] = await Promise.all([
-      prisma.partnerTransaction.findMany({
+      prisma.transaction.findMany({
         where: { partnerId: partner.id, status: 'COMPLETED', type: 'CREDIT', createdAt: { gte: chartStartDate } },
         select: { amount: true, createdAt: true }
       }),
@@ -109,9 +109,7 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req: any, re
         apptsGrowth: Math.round(apptsGrowth),
         upcomingAppointments,
         rating: partner.rating || 0,
-        totalReviews: partner.totalReviews || 0,
-        planTier: partner.planTier,
-        planStatus: partner.planStatus
+        totalReviews: partner.totalReviews || 0
       },
       recentAppointments: recentAppointments.map(appt => ({
         id: appt.id,

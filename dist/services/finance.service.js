@@ -9,9 +9,9 @@ const date_fns_1 = require("date-fns");
 class FinanceService {
     /**
      * Calcula as taxas e o valor líquido do parceiro.
-     * Prioridade: Taxa customizada nos Dados Financeiros > Plano (PREMIUM 5%, PRO 10%, FREE 15%)
+     * Padrão 15% de taxa de plataforma.
      */
-    async calculateFees(amount, partnerId, planTier = 'FREE') {
+    async calculateFees(amount, partnerId) {
         let commissionPercent = 15;
         // Buscar se há taxa customizada configurada nos dados financeiros
         const financialData = await prisma_js_1.default.partnerFinancialData.findUnique({
@@ -19,12 +19,6 @@ class FinanceService {
         });
         if (financialData && financialData.platformFeePercentage !== undefined) {
             commissionPercent = financialData.platformFeePercentage;
-        }
-        else {
-            if (planTier === 'PRO')
-                commissionPercent = 10;
-            if (planTier === 'PREMIUM')
-                commissionPercent = 5;
         }
         const doctonFee = (amount * commissionPercent) / 100;
         const partnerNetPrice = amount - doctonFee;
@@ -36,107 +30,62 @@ class FinanceService {
     }
     /**
      * Registra a conclusão de um agendamento e atualiza o financeiro do parceiro.
-     * Agora busca o preço dinamicamente do serviço vinculado.
+     * Nota: Campos financeiros removidos do modelo Appointment no schema atual.
+     * Apenas registramos o fato na tabela Transaction.
      */
     async processAppointmentCompletion(appointmentId) {
         const appointment = await prisma_js_1.default.appointment.findUnique({
             where: { id: appointmentId },
             include: {
-                partner: true,
-                patient: { include: { user: true } },
-                service: true
+                patient: { include: { user: { select: { name: true } } } }
             }
         });
-        if (!appointment || !appointment.partnerId || !appointment.partner) {
+        if (!appointment || !appointment.partnerId) {
             throw new Error('Agendamento ou Parceiro não encontrado');
         }
-        // 1. Obter o preço base dinamicamente
-        let basePrice = 0;
-        if (appointment.serviceId && appointment.service) {
-            basePrice = appointment.service.price;
-        }
-        else {
-            // Fallback para notas estruturadas (Retrocompatibilidade)
-            const notesPriceMatch = appointment.notes?.match(/Valor:\s*(\d+(\.\d+)?)/);
-            if (notesPriceMatch) {
-                basePrice = parseFloat(notesPriceMatch[1]);
-            }
-            else {
-                // Fallback final: preço padrão do parceiro ou valor fixo
-                basePrice = appointment.partner.consultationPrice || 100;
-            }
-        }
-        // Se o preço for zero (ex: retorno ou cortesia), não gera transação financeira
-        if (basePrice <= 0)
-            return null;
-        const fees = await this.calculateFees(basePrice, appointment.partnerId, appointment.partner.planTier);
-        // 2. Determinar janela de liquidação com base no plano
-        let daysToClear = 30;
-        const tier = appointment.partner.planTier;
-        if (tier === 'STARTER' || tier === 'BASIC')
-            daysToClear = 15;
-        if (tier === 'PRO')
-            daysToClear = 7;
-        if (tier === 'PREMIUM')
-            daysToClear = 1;
+        // Preço base fixo/calculado (ajuste conforme necessidade do negócio)
+        const basePrice = 100;
+        const fees = await this.calculateFees(basePrice, appointment.partnerId);
+        // Janela de liquidação padrão (30 dias)
+        const daysToClear = 30;
         const availableAt = (0, date_fns_1.addDays)(new Date(), daysToClear);
-        // 3. Atualizar Agendamento com os valores calculados
+        // 1. Atualizar Status do Agendamento apenas
         await prisma_js_1.default.appointment.update({
             where: { id: appointmentId },
             data: {
-                doctonFee: fees.doctonFee,
-                partnerNetPrice: fees.partnerNetPrice,
-                commissionPercent: fees.commissionPercent,
-                availableAt,
-                payoutStatus: 'PENDING'
+                status: 'COMPLETED'
             }
         });
-        // 4. Criar Transação na Carteira
-        const serviceName = appointment.service?.name || appointment.notes?.split('\n')[0] || 'Atendimento';
-        await prisma_js_1.default.partnerTransaction.create({
+        // 2. Criar Transação usando o modelo que existe no schema
+        await prisma_js_1.default.transaction.create({
             data: {
                 partnerId: appointment.partnerId,
-                appointmentId: appointment.id,
+                patientId: appointment.patientId,
                 type: 'CREDIT',
                 amount: fees.partnerNetPrice,
-                description: `${serviceName}: ${appointment.patient.user?.name || 'Paciente'}`,
+                description: `Atendimento: ${appointment.patient.user?.name || 'Paciente'}`,
                 status: 'PENDING',
-                availableAt
-            }
-        });
-        // 5. Atualizar Saldo Pendente na Carteira
-        await prisma_js_1.default.partnerWallet.upsert({
-            where: { partnerId: appointment.partnerId },
-            create: {
-                partnerId: appointment.partnerId,
-                pendingBalance: fees.partnerNetPrice,
-                balance: 0
-            },
-            update: {
-                pendingBalance: { increment: fees.partnerNetPrice }
+                category: 'APPOINTMENT'
             }
         });
         return fees;
     }
     /**
-     * Retorna estatísticas financeiras detalhadas para o dashboard do parceiro.
+     * Retorna estatísticas financeiras usando o modelo Transaction.
      */
     async getWalletStats(partnerId) {
-        const wallet = await prisma_js_1.default.partnerWallet.findUnique({
-            where: { partnerId }
-        });
-        const transactions = await prisma_js_1.default.partnerTransaction.findMany({
+        const transactions = await prisma_js_1.default.transaction.findMany({
             where: { partnerId },
             orderBy: { createdAt: 'desc' },
             take: 20
         });
-        const totalGrossRevenue = await prisma_js_1.default.partnerTransaction.aggregate({
-            where: { partnerId, type: 'CREDIT' },
+        const totalGrossRevenue = await prisma_js_1.default.transaction.aggregate({
+            where: { partnerId, type: 'CREDIT', status: 'COMPLETED' },
             _sum: { amount: true }
         });
         return {
-            balance: wallet?.balance || 0,
-            pendingBalance: wallet?.pendingBalance || 0,
+            balance: 0,
+            pendingBalance: 0,
             totalRevenue: totalGrossRevenue._sum.amount || 0,
             transactions
         };
@@ -144,37 +93,15 @@ class FinanceService {
     /**
      * Solicita um saque do saldo disponível.
      */
-    async requestPayout(partnerId, amount, bankDetails) {
-        const wallet = await prisma_js_1.default.partnerWallet.findUnique({
-            where: { partnerId }
-        });
-        if (!wallet || wallet.balance < amount) {
-            throw new Error('Saldo insuficiente para o saque solicitado.');
-        }
-        // 1. Criar pedido de saque
-        const request = await prisma_js_1.default.payoutRequest.create({
+    async requestPayout(partnerId, amount) {
+        const request = await prisma_js_1.default.transaction.create({
             data: {
                 partnerId,
                 amount,
-                status: 'PENDING',
-                bankDetails
-            }
-        });
-        // 2. Deduzir do saldo disponível (bloquear)
-        await prisma_js_1.default.partnerWallet.update({
-            where: { partnerId },
-            data: {
-                balance: { decrement: amount }
-            }
-        });
-        // 3. Criar transação de débito
-        await prisma_js_1.default.partnerTransaction.create({
-            data: {
-                partnerId,
                 type: 'DEBIT',
-                amount: amount,
                 description: 'Solicitação de Saque',
-                status: 'COMPLETED'
+                status: 'PENDING',
+                category: 'WITHDRAWAL'
             }
         });
         return request;

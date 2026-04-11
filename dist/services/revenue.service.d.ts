@@ -8,7 +8,7 @@ export declare class RevenueService {
         revenuePotential: number;
     }>;
     /**
-     * Calcula o preço com desconto de Happy Hour se aplicável
+     * Calcula o preço dinâmico (Stub: HappyHourConfig removido do schema)
      */
     static calculateDynamicPrice(partnerId: string, servicePrice: number, date: Date): Promise<number>;
 }

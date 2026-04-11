@@ -1,9 +1,8 @@
 export declare class PrescriptionService {
     /**
-     * Cria uma receita digital associada a um atendimento
+     * Cria uma receita digital associada a um parceiro e paciente
      */
     createPrescription(params: {
-        appointmentId: string;
         patientId: string;
         partnerId: string;
         items: any[];
@@ -31,7 +30,7 @@ export declare class PrescriptionService {
         validUntil: Date | null;
     }>;
     /**
-     * Assina digitalmente a receita (MOCK ICP-Brasil simulado)
+     * Assina digitalmente a receita (Stub: Campos de assinatura ausentes no schema)
      */
     signPrescription(prescriptionId: string, doctorCrm: string): Promise<{
         id: string;
@@ -59,7 +58,15 @@ export declare class PrescriptionService {
     /**
      * Busca prescrições emitidas por um parceiro
      */
-    getPrescriptionsByPartner(partnerId: string): Promise<{
+    getPrescriptionsByPartner(partnerId: string): Promise<({
+        patient: {
+            id: string;
+            user: {
+                name: string;
+                avatar: string;
+            };
+        };
+    } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -81,7 +88,7 @@ export declare class PrescriptionService {
         sideEffects: string | null;
         contraindications: string | null;
         validUntil: Date | null;
-    }[]>;
+    })[]>;
 }
 export declare const prescriptionService: PrescriptionService;
 //# sourceMappingURL=prescription.service.d.ts.map

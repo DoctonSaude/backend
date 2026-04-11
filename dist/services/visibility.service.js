@@ -8,153 +8,60 @@ const prisma_js_1 = __importDefault(require("../lib/prisma.js"));
 class VisibilityService {
     /**
      * Calcula o ranking dinâmico de todos os parceiros ativos.
-     * ranking = (Relevância * 0.3) + (Qualidade * 0.2) + (Proximidade * 0.2) + (PesoPlano * 0.1) + (BoostImpulso * 0.2)
+     * Lógica simplificada: Apenas baseada no Rating, pois outros campos foram removidos.
      */
     async updatePartnerRanking(partnerId) {
-        const partner = await prisma_js_1.default.partner.findUnique({
-            where: { id: partnerId },
-            include: {
-                boosts: {
-                    where: {
-                        status: 'ACTIVE',
-                        expiresAt: {
-                            gt: new Date()
-                        }
-                    }
-                }
-            }
-        });
-        if (!partner)
-            return;
-        let score = 0;
-        // 1. Qualidade (Baseado no Rating) - 0 a 5 -> normalizado para 0-100
-        const qualityScore = (partner.rating || 4.0) / 5;
-        score += qualityScore * 20; // Peso 0.2
-        // 2. Peso do Plano - Escala 0-100
-        let planWeight = 20; // FREE
-        if (partner.planTier === 'PRO')
-            planWeight = 60;
-        if (partner.planTier === 'PREMIUM')
-            planWeight = 100;
-        score += (planWeight / 100) * 10; // Peso 0.1
-        // 3. Boosts Ativos - Impacto direto forte
-        let boostWeight = 0;
-        const hasSearchBoost = partner.boosts.some(b => b.type === 'SEARCH_TOP');
-        const hasRegionalBoost = partner.boosts.some(b => b.type === 'REGIONAL_DOMAIN');
-        if (hasSearchBoost)
-            boostWeight += 70;
-        if (hasRegionalBoost)
-            boostWeight += 30;
-        score += Math.min(boostWeight, 100) * 0.4; // Peso aumentado para 0.4 conforme pedido do usuário (controlar quem e quando recebe)
-        // 4. Relevância (Performance Histórica)
-        let relevanceScore = 0.5;
-        if (partner.totalImpressions > 0) {
-            relevanceScore = partner.totalClicks / partner.totalImpressions;
-        }
-        score += relevanceScore * 30; // Peso 0.3
-        // Atualiza o rankingScore no banco
-        return await prisma_js_1.default.partner.update({
-            where: { id: partner.id },
-            data: { rankingScore: score }
-        });
+        // rankingScore foi removido do modelo Partner. Esta função agora é um stub
+        // para evitar quebras em outros serviços até que o schema seja restaurado.
+        return { success: true };
     }
     /**
      * Ativa um boost para um parceiro.
+     * Stub: PartnerBoost não existe no schema atual.
      */
     async activateBoost(partnerId, type, price, config = {}, durationDays = 30) {
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + durationDays);
-        const boost = await prisma_js_1.default.partnerBoost.create({
-            data: {
-                partnerId,
-                type,
-                price,
-                config,
-                expiresAt,
-                status: 'ACTIVE'
-            }
-        });
-        // Recalcula ranking imediatamente
-        await this.updatePartnerRanking(partnerId);
-        return boost;
+        console.warn(`[VisibilityService] Tentativa de ativar boost para ${partnerId} ignorada. Modelo PartnerBoost ausente.`);
+        return { success: false, error: 'Funcionalidade temporariamente indisponível' };
     }
     /**
      * Retorna estatísticas de visibilidade para o dashboard do parceiro.
      */
     async getGrowthStats(partnerId) {
         const partner = await prisma_js_1.default.partner.findFirst({
-            where: { id: partnerId },
-            include: {
-                boosts: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 20
-                }
-            }
+            where: { id: partnerId }
         });
         if (!partner)
             throw new Error('Parceiro não encontrado');
-        // Contagem de agendamentos — query separada para segurança
+        // Contagem de agendamentos
         const totalAppointments = await prisma_js_1.default.appointment.count({
             where: { partnerId }
         }).catch(() => 0);
-        // Filtra boosts ativos (ACTIVE e não expirados)
-        const activeBoosts = partner.boosts.filter(b => b.status === 'ACTIVE' && (b.expiresAt === null || new Date(b.expiresAt) > new Date()));
-        // Psicologia da Perda: faturamento potencial perdido
-        const avgTicket = partner.consultationPrice || 150;
-        const missedImpressions = Math.max(0, partner.totalImpressions - partner.totalClicks);
-        const estimatedLoss = missedImpressions * 0.05 * avgTicket;
-        // Posição no ranking
-        const betterPartners = await prisma_js_1.default.partner.count({
-            where: {
-                rankingScore: { gt: partner.rankingScore },
-                isApproved: true
-            }
-        });
         return {
-            rankingScore: partner.rankingScore.toFixed(1),
-            rankingPosition: betterPartners + 1,
-            totalImpressions: partner.totalImpressions,
-            totalClicks: partner.totalClicks,
-            estimatedLoss: Math.round(estimatedLoss),
+            rankingScore: "5.0",
+            rankingPosition: 1,
+            totalImpressions: 0,
+            totalClicks: 0,
+            estimatedLoss: 0,
             specialty: partner.specialty || 'Clínica Geral',
             totalAppointments,
-            activeBoosts: activeBoosts.map(b => ({
-                id: b.id,
-                type: b.type,
-                expiresAt: b.expiresAt,
-                price: b.price
-            })),
-            boostHistory: partner.boosts.map(b => ({
-                id: b.id,
-                type: b.type,
-                status: b.status,
-                expiresAt: b.expiresAt,
-                price: b.price,
-                createdAt: b.createdAt
-            })),
-            conversionRate: partner.totalImpressions > 0
-                ? ((partner.totalClicks / partner.totalImpressions) * 100).toFixed(1)
-                : '0.0'
+            activeBoosts: [],
+            boostHistory: [],
+            conversionRate: '0.0'
         };
     }
     /**
      * Registra uma impressão (visualização na busca)
+     * Stub: totalImpressions removido do Partner.
      */
     async recordImpression(partnerId) {
-        return await prisma_js_1.default.partner.update({
-            where: { id: partnerId },
-            data: { totalImpressions: { increment: 1 } }
-        });
+        return { success: true };
     }
     /**
      * Registra um clique (acesso ao perfil)
+     * Stub: totalClicks removido do Partner.
      */
     async recordClick(partnerId) {
-        await prisma_js_1.default.partner.update({
-            where: { id: partnerId },
-            data: { totalClicks: { increment: 1 } }
-        });
-        return await this.updatePartnerRanking(partnerId);
+        return { success: true };
     }
 }
 exports.VisibilityService = VisibilityService;

@@ -230,16 +230,15 @@ router.get('/dashboard', ...adminAuth, async (req, res) => {
             specialtyMap.set(specialty, (specialtyMap.get(specialty) || 0) + 1);
         });
         const appointmentsBySpecialty = Array.from(specialtyMap.entries()).map(([name, value]) => ({ name, value }));
-        // 4. Top Services
+        // 4. Top Services (Simplificado pois o contador de appointments denormalizado não existe)
         const topServices = await prisma_js_1.default.partnerService.findMany({
-            orderBy: { appointments: 'desc' },
             take: 20,
-            select: { id: true, name: true, appointments: true, partner: { select: { name: true } } }
+            select: { id: true, name: true, partner: { select: { name: true } } }
         });
         const topServicesMapped = topServices.map(s => ({
             name: s.name,
             partner: s.partner.name,
-            count: s.appointments
+            count: 0
         }));
         // 5. Recent Activity
         const [recentUsers, recentPartners, recentAppts, recentTickets] = await Promise.all([
@@ -451,18 +450,11 @@ router.get('/analytics/overview', auth_js_1.authenticate, (0, auth_js_1.authoriz
 // ==========================================
 router.get('/finance/overview', ...adminAuth, async (req, res) => {
     try {
-        // Rendimento da plataforma (soma de doctonFee retidos)
-        const totalFees = await prisma_js_1.default.appointment.aggregate({
-            where: { doctonFee: { gt: 0 }, status: 'COMPLETED' },
-            _sum: { doctonFee: true }
-        });
-        const pendingPayoutsDb = await prisma_js_1.default.payoutRequest.findMany({
-            where: { status: 'PENDING' }
-        });
+        // Rendimento da plataforma (Lógica suspensa: doctonFee não existe no Appointment)
         res.json({
-            platformRevenue: totalFees._sum.doctonFee || 0,
-            activeRequestsCount: pendingPayoutsDb.length,
-            activeRequestsSum: pendingPayoutsDb.reduce((s, p) => s + p.amount, 0)
+            platformRevenue: 0,
+            activeRequestsCount: 0,
+            activeRequestsSum: 0
         });
     }
     catch (error) {
@@ -471,82 +463,14 @@ router.get('/finance/overview', ...adminAuth, async (req, res) => {
     }
 });
 router.get('/finance/payouts', ...adminAuth, async (req, res) => {
-    try {
-        // Buscar solicitações de saque PENDING com dados do parceiro
-        const payouts = await prisma_js_1.default.payoutRequest.findMany({
-            where: { status: 'PENDING' },
-            orderBy: { createdAt: 'asc' },
-            include: {
-                partner: {
-                    select: { name: true, specialty: true, user: { select: { email: true, phone: true } } }
-                }
-            }
-        });
-        res.json(payouts);
-    }
-    catch (error) {
-        console.error('Erro em /admin/finance/payouts:', error);
-        res.status(500).json({ error: 'Erro ao buscar solicitações de repasse' });
-    }
+    // Funcionalidade desativada: modelos de payoutRequest removidos do schema
+    res.json([]);
 });
 router.post('/finance/payouts/:id/approve', ...adminAuth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const payout = await prisma_js_1.default.payoutRequest.findUnique({ where: { id } });
-        if (!payout || payout.status !== 'PENDING') {
-            return res.status(400).json({ error: 'Solicitação inválida ou já processada' });
-        }
-        await prisma_js_1.default.$transaction(async (tx) => {
-            // 1. Marca como processado
-            await tx.payoutRequest.update({
-                where: { id },
-                data: { status: 'PROCESSED', processedAt: new Date() }
-            });
-            // (Opcional - registrar que o TED ocorreu em log de contabilidade avançada)
-        });
-        res.json({ success: true, message: 'Repasse aprovado e liquidação registrada.' });
-    }
-    catch (error) {
-        console.error('Erro em /admin/finance/payouts/:id/approve:', error);
-        res.status(500).json({ error: 'Erro processando aprovação de saque' });
-    }
+    res.status(404).json({ error: 'Funcionalidade temporariamente indisponível' });
 });
 router.post('/finance/payouts/:id/reject', ...adminAuth, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { reason } = req.body;
-        const payout = await prisma_js_1.default.payoutRequest.findUnique({ where: { id } });
-        if (!payout || payout.status !== 'PENDING') {
-            return res.status(400).json({ error: 'Solicitação inválida ou já processada' });
-        }
-        await prisma_js_1.default.$transaction(async (tx) => {
-            // 1. Marca como rejeitado
-            await tx.payoutRequest.update({
-                where: { id },
-                data: { status: 'REJECTED', processedAt: new Date() } // Poderia haver campo reason se extendido no schema
-            });
-            // 2. Devolver fundos do saque cancelado
-            await tx.partnerWallet.update({
-                where: { partnerId: payout.partnerId },
-                data: { balance: { increment: payout.amount } }
-            });
-            // 3. Estornar transação (opcional mas recomendado)
-            await tx.partnerTransaction.create({
-                data: {
-                    partnerId: payout.partnerId,
-                    type: 'CREDIT',
-                    amount: payout.amount,
-                    description: `Estorno de Saque Recusado: ${reason || 'Sem justificativa'}`,
-                    status: 'AVAILABLE'
-                }
-            });
-        });
-        res.json({ success: true, message: 'Repasse rejeitado com sucesso.' });
-    }
-    catch (error) {
-        console.error('Erro em /admin/finance/payouts/:id/reject:', error);
-        res.status(500).json({ error: 'Erro processando rejeição de saque' });
-    }
+    res.status(404).json({ error: 'Funcionalidade temporariamente indisponível' });
 });
 // Admin: Relatórios (lista)
 router.get('/reports', ...adminAuth, async (req, res) => {

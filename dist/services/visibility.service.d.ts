@@ -1,161 +1,47 @@
 export declare class VisibilityService {
     /**
      * Calcula o ranking dinâmico de todos os parceiros ativos.
-     * ranking = (Relevância * 0.3) + (Qualidade * 0.2) + (Proximidade * 0.2) + (PesoPlano * 0.1) + (BoostImpulso * 0.2)
+     * Lógica simplificada: Apenas baseada no Rating, pois outros campos foram removidos.
      */
     updatePartnerRanking(partnerId: string): Promise<{
-        id: string;
-        tenantId: string | null;
-        personId: string | null;
-        userId: string | null;
-        name: string | null;
-        phone: string | null;
-        photo: string | null;
-        crm: string | null;
-        specialty: string | null;
-        specialties: string[];
-        institution: string | null;
-        experience: number | null;
-        experienceYears: number | null;
-        rating: number | null;
-        totalReviews: number;
-        verified: boolean;
-        isApproved: boolean;
-        rejectionReason: string | null;
-        type: string;
-        description: string | null;
-        address: string | null;
-        city: string | null;
-        state: string | null;
-        zipCode: string | null;
-        lat: number | null;
-        lng: number | null;
-        acceptsEmergency: boolean;
-        acceptsInsurance: boolean;
-        acceptsOnline: boolean;
-        acceptsTelemedicine: boolean;
-        cnpj: string | null;
-        consultationPrice: number | null;
-        education: import("@prisma/client/runtime/library.js").JsonValue | null;
-        facilities: string[];
-        foundationYear: number | null;
-        insurances: string[];
-        languages: string[];
-        settings: import("@prisma/client/runtime/library.js").JsonValue | null;
-        workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        createdAt: Date;
-        updatedAt: Date;
+        success: boolean;
     }>;
     /**
      * Ativa um boost para um parceiro.
+     * Stub: PartnerBoost não existe no schema atual.
      */
-    activateBoost(partnerId: string, type: string, price: number, config?: any, durationDays?: number): Promise<any>;
+    activateBoost(partnerId: string, type: string, price: number, config?: any, durationDays?: number): Promise<{
+        success: boolean;
+        error: string;
+    }>;
     /**
      * Retorna estatísticas de visibilidade para o dashboard do parceiro.
      */
     getGrowthStats(partnerId: string): Promise<{
-        rankingScore: any;
+        rankingScore: string;
         rankingPosition: number;
-        totalImpressions: any;
-        totalClicks: any;
+        totalImpressions: number;
+        totalClicks: number;
         estimatedLoss: number;
         specialty: string;
         totalAppointments: number;
-        activeBoosts: any;
-        boostHistory: any;
+        activeBoosts: any[];
+        boostHistory: any[];
         conversionRate: string;
     }>;
     /**
      * Registra uma impressão (visualização na busca)
+     * Stub: totalImpressions removido do Partner.
      */
     recordImpression(partnerId: string): Promise<{
-        id: string;
-        tenantId: string | null;
-        personId: string | null;
-        userId: string | null;
-        name: string | null;
-        phone: string | null;
-        photo: string | null;
-        crm: string | null;
-        specialty: string | null;
-        specialties: string[];
-        institution: string | null;
-        experience: number | null;
-        experienceYears: number | null;
-        rating: number | null;
-        totalReviews: number;
-        verified: boolean;
-        isApproved: boolean;
-        rejectionReason: string | null;
-        type: string;
-        description: string | null;
-        address: string | null;
-        city: string | null;
-        state: string | null;
-        zipCode: string | null;
-        lat: number | null;
-        lng: number | null;
-        acceptsEmergency: boolean;
-        acceptsInsurance: boolean;
-        acceptsOnline: boolean;
-        acceptsTelemedicine: boolean;
-        cnpj: string | null;
-        consultationPrice: number | null;
-        education: import("@prisma/client/runtime/library.js").JsonValue | null;
-        facilities: string[];
-        foundationYear: number | null;
-        insurances: string[];
-        languages: string[];
-        settings: import("@prisma/client/runtime/library.js").JsonValue | null;
-        workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        createdAt: Date;
-        updatedAt: Date;
+        success: boolean;
     }>;
     /**
      * Registra um clique (acesso ao perfil)
+     * Stub: totalClicks removido do Partner.
      */
     recordClick(partnerId: string): Promise<{
-        id: string;
-        tenantId: string | null;
-        personId: string | null;
-        userId: string | null;
-        name: string | null;
-        phone: string | null;
-        photo: string | null;
-        crm: string | null;
-        specialty: string | null;
-        specialties: string[];
-        institution: string | null;
-        experience: number | null;
-        experienceYears: number | null;
-        rating: number | null;
-        totalReviews: number;
-        verified: boolean;
-        isApproved: boolean;
-        rejectionReason: string | null;
-        type: string;
-        description: string | null;
-        address: string | null;
-        city: string | null;
-        state: string | null;
-        zipCode: string | null;
-        lat: number | null;
-        lng: number | null;
-        acceptsEmergency: boolean;
-        acceptsInsurance: boolean;
-        acceptsOnline: boolean;
-        acceptsTelemedicine: boolean;
-        cnpj: string | null;
-        consultationPrice: number | null;
-        education: import("@prisma/client/runtime/library.js").JsonValue | null;
-        facilities: string[];
-        foundationYear: number | null;
-        insurances: string[];
-        languages: string[];
-        settings: import("@prisma/client/runtime/library.js").JsonValue | null;
-        workingHours: import("@prisma/client/runtime/library.js").JsonValue | null;
-        createdAt: Date;
-        updatedAt: Date;
+        success: boolean;
     }>;
 }
 export declare const visibilityService: VisibilityService;
