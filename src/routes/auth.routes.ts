@@ -147,7 +147,16 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
 
     // Anexar plano e onboarding se for PATIENT
     if (user.role === 'PATIENT') {
-      const patient = (user as any).patient;
+      const patient = (user as any).patient || await prisma.patient.findUnique({
+        where: { userId: user.id },
+        include: {
+          subscriptions: {
+            where: { status: 'ACTIVE' },
+            take: 1,
+            include: { plan: { select: { key: true } } }
+          }
+        }
+      });
       (userWithoutPassword as any).onboardingCompleted = patient?.onboardingCompleted ?? false;
       
       if (patient?.subscriptions?.[0]?.plan) {

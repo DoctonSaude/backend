@@ -39,35 +39,18 @@ export const UserCrud = {
   async findByEmail(email: string) {
     const prismaUser = await prisma.user.findUnique({
       where: { email },
-      include: {
-        partner: {
-          select: {
-            id: true,
-            name: true,
-            specialty: true,
-            isApproved: true,
-            rating: true,
-            totalReviews: true
-          }
-        },
-        pharmacy: {
-          select: {
-            id: true,
-            name: true,
-            isApproved: true
-          }
-        },
-        patient: {
-          include: {
-            subscriptions: {
-              include: { plan: true },
-              where: { status: 'ACTIVE' },
-              take: 1
-            }
-          }
-        }
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        role: true,
+        tenantId: true,
+        personId: true,
+        avatar: true
       }
     });
+
     return normalizeUser(prismaUser);
   },
 
