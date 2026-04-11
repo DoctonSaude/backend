@@ -21,7 +21,18 @@ export const UserCrud = {
   },
 
   async findById(id: string) {
-    const prismaUser = await prisma.user.findUnique({ where: { id } });
+    const prismaUser = await prisma.user.findUnique({ 
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        personId: true,
+        tenantId: true,
+        avatar: true
+      }
+    });
     return normalizeUser(prismaUser);
   },
 
