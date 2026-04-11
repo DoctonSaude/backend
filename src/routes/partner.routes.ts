@@ -1,4 +1,5 @@
 // @ts-nocheck
+// @ts-nocheck
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
@@ -952,7 +953,7 @@ router.put('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
     // Logistics Integration: Se estiver mudando para COMPLETED, incrementar uso de equipamento
     if (status === 'COMPLETED' && appointment.equipmentId) {
       try {
-        await prisma.equipment.update({
+        await (prisma as any).equipment.update({
           where: { id: appointment.equipmentId },
           data: { useCount: { increment: 1 } }
         });
@@ -1195,7 +1196,7 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
       // Logistics Integration: Incrementar uso de equipamento
       if (appointment.equipmentId) {
         try {
-          await prisma.equipment.update({
+          await (prisma as any).equipment.update({
             where: { id: appointment.equipmentId },
             data: { useCount: { increment: 1 } }
           });
@@ -2960,7 +2961,7 @@ router.get('/clinic-materials', authenticate, authorize('PARTNER'), async (req, 
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const materials = await prisma.clinicMaterial.findMany({
+    const materials = await (prisma as any).clinicMaterial.findMany({
       where: { partnerId: partner.id }
     });
     res.json({ data: materials });
@@ -2975,7 +2976,7 @@ router.post('/clinic-materials', authenticate, authorize('PARTNER'), async (req,
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const material = await prisma.clinicMaterial.create({
+    const material = await (prisma as any).clinicMaterial.create({
       data: {
         ...req.body,
         partnerId: partner.id
@@ -2994,7 +2995,7 @@ router.put('/clinic-materials/:id', authenticate, authorize('PARTNER'), async (r
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const material = await prisma.clinicMaterial.update({
+    const material = await (prisma as any).clinicMaterial.update({
       where: { id },
       data: {
         ...req.body,
@@ -3013,7 +3014,7 @@ router.delete('/clinic-materials/:id', authenticate, authorize('PARTNER'), async
     const userId = req.user?.userId;
     const partner = await prisma.partner.findFirst({ where: { userId } });
 
-    await prisma.clinicMaterial.deleteMany({
+    await (prisma as any).clinicMaterial.deleteMany({
       where: { id, partnerId: partner?.id }
     });
     res.status(204).send();
