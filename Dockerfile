@@ -20,7 +20,7 @@ RUN npx prisma generate
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN rm -rf dist && npm run build
 
 # Production image
 FROM node:20-slim AS runner

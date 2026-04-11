@@ -1,6 +1,6 @@
-# redeploy: 2026-04-04 (Forçando deploy manual)
 [build]
 builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "sh ./start.sh"

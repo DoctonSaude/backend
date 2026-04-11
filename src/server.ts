@@ -207,7 +207,7 @@ app.get('/api/health', async (_req, res) => {
     db: dbStatus,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    build_id: "v-atomic-fix-1"
+    build_id: "v-nuclear-final-BOSS"
   });
 });
 
