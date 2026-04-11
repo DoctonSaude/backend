@@ -5,6 +5,7 @@ node_modules
 *.log
 .runtime
 .DS_Store
-# dist/
+dist/
 build/
 out/
+src/generated/
