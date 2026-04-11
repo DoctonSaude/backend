@@ -70,7 +70,16 @@ export const UserCrud = {
   },
 
   async list() {
-    const prismaUsers = await prisma.user.findMany();
+    const prismaUsers = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        avatar: true,
+        createdAt: true
+      }
+    });
     return prismaUsers.map(normalizeUser);
   },
 };

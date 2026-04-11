@@ -264,7 +264,10 @@ router.get('/revenue/insights', authenticate, authorize('PARTNER', 'PHARMACY'), 
   res.setHeader('X-Backend-Version', '2026.04.09.v6-opt');
   try {
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
     const insights = await RevenueService.getInsights(partner.id);
     return res.json(insights);
@@ -457,7 +460,10 @@ router.get('/my-public-profile', authenticate, authorize('PARTNER'), async (req,
 router.put('/public-profile', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     // Campos permitidos para atualização
@@ -687,7 +693,10 @@ router.put('/settings', authenticate, authorize('PARTNER'), async (req, res) => 
   try {
     const settings = req.body;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
 
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
@@ -713,7 +722,10 @@ router.put('/settings', authenticate, authorize('PARTNER'), async (req, res) => 
 router.put('/plan', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const updated = await prisma.partner.update({
@@ -833,7 +845,10 @@ router.get('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
     const { id } = req.params;
     const userId = (req as any).user.userId || (req as any).user.id;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const appointment = await prisma.appointment.findFirst({
@@ -862,7 +877,10 @@ router.post('/appointments', authenticate, authorize('PARTNER'), async (req, res
     const userId = (req as any).user.userId || (req as any).user.id;
     const { patientName, patientId, dateTime, duration, isOnline, notes, professionalId, serviceId } = req.body;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     let finalPatientId = patientId;
@@ -938,7 +956,10 @@ router.put('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
     const userId = (req as any).user.userId || (req as any).user.id;
     const { dateTime, duration, isOnline, notes, status, professionalId, serviceId } = req.body;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const appointment = await prisma.appointment.update({
@@ -998,7 +1019,10 @@ router.get('/medical-records/:appointmentId', authenticate, authorize('PARTNER')
   try {
     const { appointmentId } = req.params;
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const record = await prisma.medicalRecord.findUnique({
@@ -1025,7 +1049,10 @@ router.put('/medical-records/:id', authenticate, authorize('PARTNER'), async (re
     const { id } = req.params;
     const { diagnosis, symptoms, treatment, observations, attachments } = req.body;
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const record = await prisma.medicalRecord.findUnique({ where: { id } });
@@ -1059,7 +1086,10 @@ router.post('/medical-records/:id/attachments', authenticate, authorize('PARTNER
     const { id } = req.params;
     const files = req.files as Express.Multer.File[];
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const record = await prisma.medicalRecord.findUnique({ where: { id } });
@@ -1104,7 +1134,10 @@ router.delete('/appointments/:id', authenticate, authorize('PARTNER'), async (re
     const { id } = req.params;
     const userId = (req as any).user.userId || (req as any).user.id;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     await prisma.appointment.delete({
@@ -1126,7 +1159,10 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
 
     if (!code) return res.status(400).json({ error: 'Código é obrigatório' });
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     // Busca agendamento por ID exato ou sufixo
@@ -1344,7 +1380,10 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
     try {
       // Tentar pegar o parceiro se userId estiver disponível
       const userId = (req as any).user?.userId || (req as any).user?.id;
-      const partner = userId ? await prisma.partner.findFirst({ where: { userId } }) : null;
+      const partner = userId ? await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    }) : null;
 
       await prisma.validationCodeLog.create({
         data: {
@@ -1417,7 +1456,10 @@ router.get('/availability', authenticate, async (req, res, next) => {
 
     let where: any = {};
     if (role === 'PARTNER') {
-      const partner = await prisma.partner.findUnique({ where: { userId } });
+      const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
       if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
       where.partnerId = partner.id;
     } else if (role === 'PATIENT') {
@@ -1526,7 +1568,10 @@ router.put('/availability/:id', authenticate, authorize('PARTNER'), async (req, 
 router.get('/reports', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const reports = await prisma.report.findMany({
@@ -1543,7 +1588,10 @@ router.get('/reports', authenticate, authorize('PARTNER'), async (req, res) => {
 router.post('/reports/quick', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const now = new Date();
@@ -1574,7 +1622,10 @@ router.post('/reports/quick', authenticate, authorize('PARTNER'), async (req, re
 router.get('/financial-data', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const data = await prisma.partnerFinancialData.findUnique({
@@ -1592,7 +1643,10 @@ router.get('/financial-data', authenticate, authorize('PARTNER'), async (req, re
 router.put('/financial-data', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const existingData = await prisma.partnerFinancialData.findUnique({
@@ -1661,7 +1715,10 @@ router.get('/services', authenticate, authorize('PARTNER'), (req, res) => {
       const userId = req.user?.userId;
       if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
 
-      const partner = await prisma.partner.findUnique({ where: { userId } });
+      const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
       if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
       const data = await prisma.partnerService.findMany({
@@ -1684,7 +1741,10 @@ router.get('/services/:serviceId', authenticate, authorize('PARTNER'), (req, res
       const userId = req.user?.userId;
       if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
 
-      const partner = await prisma.partner.findUnique({ where: { userId } });
+      const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
       if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
       const data = await prisma.partnerService.findFirst({
@@ -1709,7 +1769,10 @@ router.post('/services', authenticate, authorize('PARTNER'), async (req, res) =>
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
 
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const {
@@ -1756,7 +1819,10 @@ router.put('/services/:serviceId', authenticate, authorize('PARTNER'), async (re
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
 
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const existing = await prisma.partnerService.findFirst({
@@ -1797,7 +1863,10 @@ router.delete('/services/:serviceId', authenticate, authorize('PARTNER'), (req, 
       const userId = req.user?.userId;
       if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
 
-      const partner = await prisma.partner.findUnique({ where: { userId } });
+      const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
       if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
       const existing = await prisma.partnerService.findFirst({
@@ -1824,7 +1893,10 @@ router.put('/services/:serviceId/toggle-status', authenticate, authorize('PARTNE
       const userId = req.user?.userId;
       if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
 
-      const partner = await prisma.partner.findUnique({ where: { userId } });
+      const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
       if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
       const existing = await prisma.partnerService.findFirst({
@@ -1851,7 +1923,10 @@ router.put('/services/:serviceId/toggle-status', authenticate, authorize('PARTNE
 router.get('/team', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const team = await prisma.teamMember.findMany({
@@ -1870,7 +1945,10 @@ router.get('/team', authenticate, authorize('PARTNER'), async (req, res) => {
 router.post('/team', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const { name, specialty, crm, email, phone } = req.body;
@@ -1900,7 +1978,10 @@ router.post('/team', authenticate, authorize('PARTNER'), async (req, res) => {
 router.put('/team/:id', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const { name, specialty, crm, isActive, email, phone } = req.body;
@@ -1920,7 +2001,10 @@ router.put('/team/:id', authenticate, authorize('PARTNER'), async (req, res) => 
 router.post('/team/:id/avatar', authenticate, authorize('PARTNER'), upload.single('avatar'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     if (!req.file) {
@@ -1959,7 +2043,10 @@ router.post('/team/:id/avatar', authenticate, authorize('PARTNER'), upload.singl
 router.delete('/team/:id', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     await prisma.teamMember.delete({
@@ -1978,7 +2065,10 @@ router.delete('/team/:id', authenticate, authorize('PARTNER'), async (req, res) 
 router.post('/documents/upload', authenticate, authorize('PARTNER'), upload.single('file'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     if (!req.file) {
@@ -2018,7 +2108,10 @@ router.post('/documents/upload', authenticate, authorize('PARTNER'), upload.sing
 router.get('/documents', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const docs = await prisma.partnerDocument.findMany({
@@ -2037,7 +2130,10 @@ router.get('/documents', authenticate, authorize('PARTNER'), async (req, res) =>
 router.get('/reviews/stats', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findUnique({ where: { userId } });
+    const partner = await prisma.partner.findUnique({ 
+      where: { userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const reviews = await prisma.review.findMany({
@@ -2274,7 +2370,10 @@ router.get('/reports/stats', authenticate, authorize('PARTNER'), async (req, res
     const userId = req.user?.userId;
     const { startDate, endDate } = req.query;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const start = startDate ? new Date(String(startDate)) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -2583,7 +2682,10 @@ router.get('/reports/:reportType/export', authenticate, authorize('PARTNER'), as
 router.get('/payments', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const transactions = await prisma.partnerTransaction.findMany({
@@ -2640,7 +2742,10 @@ router.get('/payments', authenticate, authorize('PARTNER'), async (req, res) => 
 router.get('/payments/stats', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const wallet = await prisma.partnerWallet.findUnique({
@@ -2680,7 +2785,10 @@ router.get('/payments/:id/receipt', authenticate, authorize('PARTNER'), async (r
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     const transfer = await prisma.transfer.findFirst({
       where: { id, partnerId: partner?.id }
@@ -2702,7 +2810,10 @@ router.get('/payments/:id/receipt', authenticate, authorize('PARTNER'), async (r
 router.post('/payments/anticipate', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     // Simulação de solicitação de antecipação
@@ -2717,7 +2828,10 @@ router.post('/payments/anticipate', authenticate, authorize('PARTNER'), async (r
 router.get('/challenges', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const challenges = await wearablesPilotService.getPartnerChallenges(partner.id);
@@ -2731,7 +2845,10 @@ router.get('/challenges', authenticate, authorize('PARTNER'), async (req, res) =
 router.post('/challenges', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const created = await wearablesPilotService.createChallenge({
@@ -2751,7 +2868,10 @@ router.put('/challenges/:id', authenticate, authorize('PARTNER'), async (req, re
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     // Verificar se o desafio pertence ao parceiro
     const challenge = await prisma.challenge.findFirst({ where: { id, createdBy: partner?.id } });
@@ -2769,7 +2889,10 @@ router.delete('/challenges/:id', authenticate, authorize('PARTNER'), async (req,
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     // Verificar se o desafio pertence ao parceiro
     const challenge = await prisma.challenge.findFirst({ where: { id, createdBy: partner?.id } });
@@ -2791,7 +2914,10 @@ router.delete('/challenges/:id', authenticate, authorize('PARTNER'), async (req,
 router.get('/validation-codes/logs', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const result = await validationCodeService.getLogs({
@@ -2808,7 +2934,10 @@ router.get('/validation-codes/logs', authenticate, authorize('PARTNER'), async (
 router.get('/validation-codes/stats', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const stats = await validationCodeService.getStats({
@@ -2829,7 +2958,10 @@ router.get('/validation-codes/stats', authenticate, authorize('PARTNER'), async 
 router.get('/rooms', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const rooms = await prisma.room.findMany({
@@ -2845,7 +2977,10 @@ router.get('/rooms', authenticate, authorize('PARTNER'), async (req, res) => {
 router.post('/rooms', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const room = await prisma.room.create({
@@ -2864,7 +2999,10 @@ router.put('/rooms/:id', authenticate, authorize('PARTNER'), async (req, res) =>
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const room = await prisma.room.update({
@@ -2884,7 +3022,10 @@ router.delete('/rooms/:id', authenticate, authorize('PARTNER'), async (req, res)
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     await prisma.room.deleteMany({
       where: { id, partnerId: partner?.id }
@@ -2898,7 +3039,10 @@ router.delete('/rooms/:id', authenticate, authorize('PARTNER'), async (req, res)
 router.get('/equipment', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const equipments = await prisma.equipment.findMany({
@@ -2913,7 +3057,10 @@ router.get('/equipment', authenticate, authorize('PARTNER'), async (req, res) =>
 router.post('/equipment', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const equipment = await prisma.equipment.create({
@@ -2932,7 +3079,10 @@ router.put('/equipment/:id', authenticate, authorize('PARTNER'), async (req, res
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const equipment = await prisma.equipment.update({
@@ -2952,7 +3102,10 @@ router.delete('/equipment/:id', authenticate, authorize('PARTNER'), async (req, 
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     await prisma.equipment.deleteMany({
       where: { id, partnerId: partner?.id }
@@ -2968,7 +3121,10 @@ router.delete('/equipment/:id', authenticate, authorize('PARTNER'), async (req, 
 router.get('/clinic-materials', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const materials = await (prisma as any).clinicMaterial.findMany({
@@ -2983,7 +3139,10 @@ router.get('/clinic-materials', authenticate, authorize('PARTNER'), async (req, 
 router.post('/clinic-materials', authenticate, authorize('PARTNER'), async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const material = await (prisma as any).clinicMaterial.create({
@@ -3002,7 +3161,10 @@ router.put('/clinic-materials/:id', authenticate, authorize('PARTNER'), async (r
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const material = await (prisma as any).clinicMaterial.update({
@@ -3022,7 +3184,10 @@ router.delete('/clinic-materials/:id', authenticate, authorize('PARTNER'), async
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     await (prisma as any).clinicMaterial.deleteMany({
       where: { id, partnerId: partner?.id }
@@ -3068,7 +3233,10 @@ router.post('/combos', authenticate, authorize('PARTNER'), async (req, res) => {
     const userId = (req as any).user.userId || (req as any).user.id;
     const { name, description, price, serviceIds } = req.body;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const combo = await prisma.serviceCombo.create({
@@ -3095,7 +3263,10 @@ router.delete('/combos/:id', authenticate, authorize('PARTNER'), async (req, res
   try {
     const { id } = req.params;
     const userId = (req as any).user.userId || (req as any).user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
 
     await prisma.serviceCombo.deleteMany({
       where: { id, partnerId: partner?.id }
@@ -3112,7 +3283,10 @@ router.put('/revenue/happy-hour', authenticate, authorize('PARTNER'), async (req
     const userId = (req as any).user.userId || (req as any).user.id;
     const { happyHourConfig } = req.body;
 
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId },
+      select: { id: true, userId: true, name: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const updated = await prisma.partner.update({
@@ -3208,7 +3382,10 @@ router.post('/finance/payout', authenticate, authorize('PARTNER'), async (req: a
 // Busca estatísticas de NPS e reputação
 router.get('/reputation/stats', authenticate, authorize('PARTNER'), async (req: any, res) => {
   try {
-    const partner = await prisma.partner.findFirst({ where: { userId: req.user.userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId: req.user.userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
     
     const stats = await reputationService.getReputationStats(partner.id);
@@ -3221,7 +3398,10 @@ router.get('/reputation/stats', authenticate, authorize('PARTNER'), async (req: 
 // Busca todas as avaliações
 router.get('/reputation/reviews', authenticate, authorize('PARTNER'), async (req: any, res) => {
   try {
-    const partner = await prisma.partner.findFirst({ where: { userId: req.user.userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId: req.user.userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const reviews = await reputationService.getPartnerReviews(partner.id);
@@ -3237,7 +3417,10 @@ router.post('/reputation/reviews/:reviewId/reply', authenticate, authorize('PART
     const { reply } = req.body;
     const { reviewId } = req.params;
     
-    const partner = await prisma.partner.findFirst({ where: { userId: req.user.userId } });
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId: req.user.userId },
+      select: { id: true, userId: true }
+    });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
     const updatedReview = await reputationService.replyToReview(reviewId, partner.id, reply);
