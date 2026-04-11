@@ -30,7 +30,16 @@ exports.UserCrud = {
         const prismaUser = await prisma_1.default.user.findUnique({
             where: { email },
             include: {
-                partner: true,
+                partner: {
+                    select: {
+                        id: true,
+                        name: true,
+                        specialty: true,
+                        isApproved: true,
+                        rating: true,
+                        totalReviews: true
+                    }
+                },
                 pharmacy: true,
                 patient: {
                     include: {

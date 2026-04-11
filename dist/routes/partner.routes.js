@@ -2422,7 +2422,7 @@ router.get('/payments/stats', auth_js_1.authenticate, (0, auth_js_1.authorize)('
             monthlyAverage: yearTotal > 0 ? (yearTotal / (new Date().getMonth() + 1)) : 0,
             totalAppointments: appointmentsCount,
             yearTotal,
-            averageMargin: 100 - (partner.planTier === 'PREMIUM' ? 5 : partner.planTier === 'PRO' ? 10 : 15),
+            averageMargin: 15, // Padrão fixo (planTier removido do banco)
             totalDoctonRevenue: yearTotal * 0.1,
             growth: 0
         });

@@ -35,7 +35,6 @@ export const UserCrud = {
             name: true,
             specialty: true,
             isApproved: true,
-            isOnline: true,
             rating: true,
             totalReviews: true
           }
