@@ -39,7 +39,7 @@ export function dbErrorHandlerMiddleware(err: any, req: Request, res: Response, 
     const dataEndpoints = [
       '/api/auth/validate',
       '/api/patients/dashboard',
-      '/api/gamification/dashboard',
+      '/api/gamification',
       '/api/loyalty/me',
       '/api/notifications',
       '/api/analytics'

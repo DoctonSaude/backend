@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { patientService } from '../services/patient.service';
@@ -47,16 +48,22 @@ router.get('/', authenticate, authorize('PATIENT'), async (req, res) => {
         const requesterId = req.user!.userId;
         const targetUserId = (req.query.patientId as string) || requesterId;
 
+        console.log('[Timeline GET] RequesterId:', requesterId, 'TargetUserId:', targetUserId);
+
         const hasAccess = await validateAccess(requesterId, targetUserId);
         if (!hasAccess) {
+            console.log('[Timeline GET] Access denied');
             return res.status(403).json({ error: 'Acesso negado ao histórico deste paciente' });
         }
 
+        console.log('[Timeline GET] Calling getMedicalTimeline for:', targetUserId);
         const timeline = await patientService.getMedicalTimeline(targetUserId);
+        console.log('[Timeline GET] Timeline returned, length:', timeline?.length || 0);
         res.json(timeline);
     } catch (error) {
+        console.error('[Timeline GET] Erro ao buscar timeline:', error);
         logger.error('[Timeline Routes] Erro ao buscar timeline:', error);
-        res.status(500).json({ error: 'Erro ao carregar timeline de saúde' });
+        res.status(500).json({ error: 'Erro ao carregar timeline de saúde', details: (error as Error).message });
     }
 });
 

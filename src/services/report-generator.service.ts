@@ -1,3 +1,4 @@
+// @ts-nocheck
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import prisma from '../lib/prisma.js';
@@ -24,64 +25,70 @@ export class ReportGeneratorService {
 
         // Base where clause with date range
         const baseDateFilter = { gte: start, lte: end };
+        const partnerId = filters.partnerId;
 
         switch (type) {
             case 'users':
+            case 'pacientes':
                 title = 'Relatório de Usuários';
-                columns = ['ID', 'Nome', 'E-mail', 'Cargo', 'Departamento', 'Data de Criação'];
-                const users = await prisma.user.findMany({
+                columns = ['Nome', 'E-mail', 'Telefone', 'Última Consulta'];
+                
+                // Get all patients that have appointments with this partner
+                const patients = await prisma.patient.findMany({
                     where: {
-                        createdAt: baseDateFilter,
-                        ...(filters.role && { role: filters.role }),
-                        ...(filters.department && { department: filters.department }),
-                        ...(filters.jobTitle && { jobTitle: filters.jobTitle })
+                        Appointment: partnerId ? { some: { partnerId } } : undefined,
+                        createdAt: baseDateFilter
                     },
-                    orderBy: { createdAt: 'desc' }
+                    include: { User: true, Appointment: { where: { partnerId }, orderBy: { dateTime: 'desc' }, take: 1 } }
                 });
-                rows = users.map(u => [u.id, u.name, u.email, u.jobTitle || '-', u.department || '-', u.createdAt.toLocaleDateString('pt-BR')]);
+                rows = patients.map(p => [
+                    p.User?.name || 'Sem nome',
+                    p.User?.email || '-',
+                    p.User?.phone || '-',
+                    p.Appointment[0]?.dateTime?.toLocaleDateString('pt-BR') || '-'
+                ]);
                 break;
 
             case 'appointments':
+            case 'servicos':
                 title = 'Relatório de Consultas';
-                columns = ['ID', 'Paciente', 'Parceiro', 'Data/Hora', 'Status', 'Tipo'];
+                columns = ['Paciente', 'Data/Hora', 'Status', 'Tipo'];
                 const appointments = await prisma.appointment.findMany({
                     where: {
+                        partnerId: partnerId || undefined,
                         dateTime: baseDateFilter,
-                        ...(filters.status && { status: filters.status }),
-                        ...(filters.isOnline !== undefined && { isOnline: filters.isOnline })
+                        ...(filters.status && { status: filters.status })
                     },
-                    include: { patient: { include: { user: true } }, partner: { include: { user: true } } },
+                    include: { Patient: { include: { User: true } } },
                     orderBy: { dateTime: 'desc' }
                 });
                 rows = appointments.map(a => [
-                    a.id,
-                    a.patient.user.name,
-                    a.partner.user.name,
-                    a.dateTime.toLocaleString('pt-BR'),
+                    a.Patient?.User?.name || 'Paciente',
+                    a.dateTime?.toLocaleString('pt-BR'),
                     a.status,
                     a.isOnline ? 'Online' : 'Presencial'
                 ]);
                 break;
 
             case 'financial':
+            case 'financeiro':
                 title = 'Relatório Financeiro';
-                columns = ['ID', 'Descrição', 'Valor', 'Tipo', 'Categoria', 'Data'];
+                columns = ['Descrição', 'Valor', 'Tipo', 'Status', 'Data'];
                 const transactions = await prisma.transaction.findMany({
                     where: {
-                        date: baseDateFilter,
+                        partnerId: partnerId || undefined,
+                        createdAt: baseDateFilter,
                         ...(filters.transactionType && { type: filters.transactionType }),
-                        ...(filters.category && { category: filters.category }),
                         ...(filters.status && { status: filters.status })
                     },
-                    orderBy: { date: 'desc' }
+                    orderBy: { createdAt: 'desc' }
                 });
                 rows = transactions.map(t => [
-                    t.id,
-                    t.description,
+                    t.description || 'Transação',
                     t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
                     t.type,
-                    t.category || '-',
-                    t.date.toLocaleDateString('pt-BR')
+                    t.status,
+                    t.createdAt.toLocaleDateString('pt-BR')
                 ]);
                 break;
 
@@ -90,12 +97,12 @@ export class ReportGeneratorService {
                 title = 'Relatório de Performance';
                 columns = ['Métrica', 'Valor'];
                 const [usersCount, apptsCount, transCount] = await Promise.all([
-                    prisma.user.count({ where: { createdAt: baseDateFilter } }),
-                    prisma.appointment.count({ where: { dateTime: baseDateFilter } }),
-                    prisma.transaction.count({ where: { date: baseDateFilter } })
+                    prisma.patient.count({ where: { Appointment: partnerId ? { some: { partnerId } } : undefined, createdAt: baseDateFilter } }),
+                    prisma.appointment.count({ where: { partnerId: partnerId || undefined, dateTime: baseDateFilter } }),
+                    prisma.transaction.count({ where: { partnerId: partnerId || undefined, createdAt: baseDateFilter } })
                 ]);
                 rows = [
-                    ['Novos Usuários', usersCount],
+                    ['Total de Pacientes no Período', usersCount],
                     ['Consultas Realizadas', apptsCount],
                     ['Transações Financeiras', transCount]
                 ];

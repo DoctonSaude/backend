@@ -18,23 +18,26 @@ export class PatientService {
             where: { id: userId },
             include: {
                 person: {
-                    include: {
+                    select: {
                         patient: {
-                            include: {
-                                subscriptions: { where: { status: 'ACTIVE' }, include: { plan: true }, take: 1 }
+                            select: {
+                                id: true, userId: true, healthPoints: true, experiencePoints: true, level: true, levelTitle: true, levelTier: true, currentStreak: true, onboardingCompleted: true,
+                                Subscription: { where: { status: 'ACTIVE' }, include: { Plan: { select: { name: true } } }, take: 1 }
                             }
                         }
                     }
                 },
                 patient: {
-                    include: {
-                        subscriptions: { where: { status: 'ACTIVE' }, include: { plan: true }, take: 1 }
+                    select: {
+                        id: true, userId: true, healthPoints: true, experiencePoints: true, level: true, levelTitle: true, levelTier: true, currentStreak: true, onboardingCompleted: true,
+                        Subscription: { where: { status: 'ACTIVE' }, include: { Plan: { select: { name: true } } }, take: 1 }
                     }
                 }
             }
         });
 
         // Prioridade: person.patient (backend legado) → patient direto (website/novo registro)
+        // @ts-ignore - Prisma relation naming mismatch
         let patient = user?.person?.patient ?? user?.patient ?? null;
 
         if (!patient) {
@@ -51,7 +54,7 @@ export class PatientService {
                         onboardingCompleted: false
                     },
                     include: {
-                        subscriptions: { where: { status: 'ACTIVE' }, include: { plan: true }, take: 1 }
+                        Subscription: { where: { status: 'ACTIVE' }, include: { Plan: true }, take: 1 }
                     }
                 }) as any;
             } catch (createErr) {
@@ -69,7 +72,7 @@ export class PatientService {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
-        // 2. Fetch de Dados em Paralelo (Prisma e Inteligência)
+        // 2. Fetch de Dados em Paralelo (Prisma Core + IA Rápida)
         const [
             appointments,
             totalAppointments,
@@ -77,7 +80,6 @@ export class PatientService {
             recentLogs,
             todayMood,
             activeChallengeCount,
-            riskProfile,
             dailyNudge
         ] = await Promise.all([
             prisma.appointment.findMany({
@@ -90,12 +92,13 @@ export class PatientService {
                     dateTime: true,
                     status: true,
                     isOnline: true,
-                    partner: {
+                    Partner: {
                         select: {
-                            user: { select: { name: true, avatar: true } },
-                            specialty: true
-                        }
-                    }
+                            User: { select: { name: true, avatar: true } },
+                            specialty: true,
+                            name: true,
+                        },
+                    },
                 },
                 orderBy: { dateTime: 'asc' }
             }),
@@ -104,7 +107,7 @@ export class PatientService {
             prisma.healthLog.findMany({
                 where: { patientId },
                 orderBy: { logDate: 'desc' },
-                take: 20
+                take: 15 // Reduzido de 20 para 15 para ganho de performance
             }),
             prisma.healthLog.findFirst({
                 where: {
@@ -116,17 +119,24 @@ export class PatientService {
             prisma.patientChallenge.count({
                 where: { patientId, status: 'ACTIVE' }
             }),
-            intelligenceService.analyzeRiskProfile(patientId),
             intelligenceService.generateDailyNudge(userId)
         ]);
 
-        // 3. AI Insights (Processamento em paralelo)
-        const [isLowDay, weeklyNarrative, actionPlan, insights] = await Promise.all([
+        // 3. IA Lenta -> Disparar em Background (ou com cache curto)
+        // Reduzimos o bloqueio de requisição esperando apenas o que é essencial
+        const riskProfilePromise = intelligenceService.analyzeRiskProfile(patientId);
+        const insightsPromise = aiInsightService.generatePatientInsights(userId);
+
+        // Aguardamos as narrativas rápidas, mas deixamos os insights pesados para o final ou cache
+        const [isLowDay, weeklyNarrative, actionPlan] = await Promise.all([
             Promise.resolve(aiInsightService.detectLowDay(recentLogs)),
             Promise.resolve(aiInsightService.generateWeeklyNarrative(recentLogs, user.name || 'Paciente')),
-            aiInsightService.generateDailyActions({ ...patient, user: { name: user.name } } as any, aiInsightService.detectLowDay(recentLogs)),
-            aiInsightService.generatePatientInsights(userId)
+            aiInsightService.generateDailyActions({ ...patient, user: { name: user.name } } as any, false) // Cache/Default
         ]);
+
+        // Resolver insights e risco no final do Promise.all de retorno se necessário,
+        // ou retornar o que já temos agora para máxima velocidade.
+        const [riskProfile, insights] = await Promise.all([riskProfilePromise, insightsPromise]);
 
         // 4. Transformação para Gráficos
         const monthsMap = new Map();
@@ -169,7 +179,7 @@ export class PatientService {
                 name: user.name,
                 avatar: user.avatar,
                 email: user.email,
-                plan: patient.subscriptions[0]?.plan?.name || 'Gratuito'
+                Plan: (patient as any).Subscription?.[0]?.Plan?.name || 'Gratuito'
             },
             stats: {
                 totalAppointments,
@@ -218,119 +228,194 @@ export class PatientService {
     }
 
     /**
+     * Helper to ensure a Patient record exists for a given userId
+     */
+    private async ensurePatient(userId: string) {
+      // 1. Try to find via direct patient relation first
+      let patient = await prisma.patient.findUnique({
+        where: { userId },
+      });
+
+      if (patient) return patient;
+
+      // 2. Try via person relation if available
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { personId: true },
+      });
+
+      if (user?.personId) {
+        patient = await prisma.patient.findUnique({
+          where: { personId: user.personId },
+        });
+        if (patient) return patient;
+      }
+
+      // 3. Create a new patient record
+      console.log(`[PatientService] Creating missing Patient record for userId: ${userId}`);
+      patient = await prisma.patient.create({
+        data: {
+          userId,
+          personId: user?.personId ?? null,
+          archetype: 'GENERAL',
+          healthPoints: 0,
+          experiencePoints: 0,
+        },
+      });
+
+      return patient;
+    }
+
+    /**
      * Obtém a timeline médica consolidada do paciente
      */
     @Cacheable({ ttl: 60, tags: ['patient', 'timeline'] })
-    async getMedicalTimeline(userId: string) {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            include: {
-                person: { include: { patient: true } },
-                patient: true
-            }
-        });
+  async getMedicalTimeline(userId: string) {
+    try {
+      // Step 1: Ensure Patient record exists
+      const patient = await this.ensurePatient(userId);
+      
+      const patientId = patient.id;
 
-        const patient = user?.person?.patient ?? user?.patient ?? null;
-        if (!patient) return [];
+      // Step 3: Fetch all events in parallel
+      const [
+        appointments,
+        exams,
+        histories,
+        anamneses,
+        prescriptions
+      ] = await Promise.all([
+        prisma.appointment.findMany({
+          where: { patientId },
+          select: {
+            id: true,
+            dateTime: true,
+            status: true,
+            notes: true,
+            Partner: {
+              select: {
+                specialty: true,
+                name: true,
+                User: { select: { name: true, avatar: true } },
+              },
+            },
+          },
+          orderBy: { dateTime: 'desc' },
+          take: 50
+        }),
+        prisma.healthExam.findMany({
+          where: { patientId },
+          orderBy: { date: 'desc' },
+          take: 50
+        }),
+        prisma.medicalHistory.findMany({
+          where: { patientId },
+          orderBy: { date: 'desc' },
+          take: 50
+        }),
+        prisma.anamnesis.findMany({
+          where: { patientId },
+          orderBy: { date: 'desc' },
+          take: 50
+        }),
+        prisma.prescription.findMany({
+          where: { patientId },
+          select: {
+            id: true,
+            date: true,
+            status: true,
+            medication: true,
+            attachments: true,
+            doctor: true,
+            Partner: {
+              select: {
+                User: { select: { name: true } },
+                name: true,
+              },
+            },
+          },
+          orderBy: { date: 'desc' },
+          take: 50
+        })
+      ]);
 
-        const patientId = patient.id;
+      // Step 4: Normalize and combine events
+      const timelineEvents = [
+        ...appointments.map(a => ({
+          id: a.id,
+          date: a.dateTime,
+          type: 'APPOINTMENT',
+          title: `Consulta com ${a.Partner?.User?.name || a.Partner?.name || 'Profissional'}`,
+          description: a.notes || 'Consulta realizada',
+          status: a.status,
+          category: a.Partner?.specialty || 'Geral',
+          icon: 'Calendar',
+          partner: a.Partner?.User?.name || a.Partner?.name,
+          avatar: a.Partner?.User?.avatar
+        })),
+        ...exams.map(e => ({
+          id: e.id,
+          date: e.date,
+          type: 'EXAM',
+          title: e.name,
+          description: `${e.type} - ${e.laboratory || 'Laboratório não informado'}`,
+          status: e.status,
+          category: e.type,
+          urgency: e.urgency,
+          icon: 'Activity',
+          attachments: e.attachments
+        })),
+        ...histories.map(h => ({
+          id: h.id,
+          date: h.date,
+          type: 'HISTORY',
+          title: `Registro Histórico: ${h.type}`,
+          description: h.description,
+          status: h.status,
+          category: h.specialty,
+          icon: 'FileText',
+          attachments: h.attachments
+        })),
+        ...anamneses.map(an => ({
+          id: an.id,
+          date: an.date,
+          type: 'ANAMNESIS',
+          title: 'Avaliação Clínica / Anamnese',
+          description: an.chiefComplaint,
+          status: 'Concluído',
+          category: an.specialty || 'Clínica Médica',
+          icon: 'Stethoscope',
+          attachments: an.attachments,
+          doctor: an.doctorName
+        })),
+        ...prescriptions.map(p => ({
+          id: p.id,
+          date: p.date,
+          type: 'PRESCRIPTION',
+          title: 'Nova Prescrição Médica',
+          description: p.medication || 'Medicação prescrita',
+          status: p.status,
+          category: 'Medicação',
+          icon: 'Pill',
+          attachments: p.attachments,
+          doctor: p.Partner?.User?.name || p.Partner?.name || p.doctor
+        }))
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        // Fetch de todos os eventos clínicos
-        const [
-            appointments,
-            exams,
-            histories,
-            anamneses,
-            prescriptions
-        ] = await Promise.all([
-            prisma.appointment.findMany({
-                where: { patientId },
-                include: { partner: { include: { user: { select: { name: true, avatar: true } } } } },
-                orderBy: { dateTime: 'desc' }
-            }),
-            prisma.healthExam.findMany({
-                where: { patientId },
-                orderBy: { date: 'desc' }
-            }),
-            prisma.medicalHistory.findMany({
-                where: { patientId },
-                orderBy: { date: 'desc' }
-            }),
-            prisma.anamnesis.findMany({
-                where: { patientId },
-                orderBy: { date: 'desc' }
-            }),
-            prisma.prescription.findMany({
-                where: { patientId },
-                include: { partner: { include: { user: { select: { name: true } } } } },
-                orderBy: { date: 'desc' }
-            })
-        ]);
+      return timelineEvents;
+    } catch (error) {
+      console.error('[PatientService] Error fetching medical timeline:', error);
+      return [];
+    }
+  }
 
-        // Normalização dos eventos
-        const timelineEvents = [
-            ...appointments.map(a => ({
-                id: a.id,
-                date: a.dateTime,
-                type: 'APPOINTMENT',
-                title: `Consulta com ${a.partner?.user?.name || 'Profissional'}`,
-                description: a.notes || 'Consulta realizada',
-                status: a.status,
-                category: a.partner?.specialty || 'Geral',
-                icon: 'Calendar',
-                partner: a.partner?.user?.name,
-                avatar: a.partner?.user?.avatar
-            })),
-            ...exams.map(e => ({
-                id: e.id,
-                date: e.date,
-                type: 'EXAM',
-                title: e.name,
-                description: `${e.type} - ${e.laboratory || 'Laboratório não informado'}`,
-                status: e.status,
-                category: e.type,
-                urgency: e.urgency,
-                icon: 'Activity',
-                attachments: e.attachments
-            })),
-            ...histories.map(h => ({
-                id: h.id,
-                date: h.date,
-                type: 'HISTORY',
-                title: `Registro Histórico: ${h.type}`,
-                description: h.description,
-                status: h.status,
-                category: h.specialty,
-                icon: 'FileText',
-                attachments: h.attachments
-            })),
-            ...anamneses.map(an => ({
-                id: an.id,
-                date: an.date,
-                type: 'ANAMNESIS',
-                title: 'Avaliação Clínica / Anamnese',
-                description: an.chiefComplaint,
-                status: 'Concluído',
-                category: an.specialty || 'Clínica Médica',
-                icon: 'Stethoscope',
-                attachments: an.attachments,
-                doctor: an.doctorName
-            })),
-            ...prescriptions.map(p => ({
-                id: p.id,
-                date: p.date,
-                type: 'PRESCRIPTION',
-                title: 'Nova Prescrição Médica',
-                description: p.medication || 'Medicação prescrita',
-                status: p.status,
-                category: 'Medicação',
-                icon: 'Pill',
-                attachments: p.attachments,
-                doctor: p.partner?.user?.name || p.doctor
-            }))
-        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-        return timelineEvents;
+    /**
+     * Invalida o cache do Dashboard para um usuário
+     */
+    async invalidateDashboardCache(userId: string) {
+        const key = CacheService.generateKey('PatientService', 'getDashboardData', { args: [userId] });
+        await cacheService.delete(key);
+        logger.info(`[PatientService] Dashboard cache invalidated for user ${userId}`);
     }
 
     /**

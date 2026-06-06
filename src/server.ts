@@ -1,5 +1,10 @@
 console.log('!!! BOOTSTRAP STARTING !!! ', new Date().toISOString());
-console.log('REDIS_URL (masked):', process.env.REDIS_URL ? process.env.REDIS_URL.replace(/:[^@]+@/, ':****@') : 'MISSING');
+const redisUrl = process.env.REDIS_URL;
+if (redisUrl) {
+  console.log('REDIS_URL (masked):', redisUrl.replace(/:[^@]+@/, ':****@'));
+} else {
+  console.warn('Redis não configurado - usando fallback');
+}
 
 // Triggering restart after .env change
 import 'dotenv/config';
@@ -10,8 +15,8 @@ import 'dotenv/config';
 };
 
 import express, { Request, Response, NextFunction } from 'express';
-console.log('!!! SERVER BOOT V18 - NUCLEAR STABILIZATION ACTIVE !!!');
-console.log('!!! CACHE CLEARED - DISMISSING ZOMBIE VERSIONS !!!');
+import { Server } from 'http';
+console.log('!!! SERVER BOOT V9 - GAMIFICATION STABILIZATION ACTIVE !!!');
 
 export const app = express();
 
@@ -26,14 +31,14 @@ app.get('/api/nuclear-test-final', (req, res) => {
 app.get('/api/ping', (req, res) => {
   res.status(200).json({
     status: 'ok',
-    version: 'v8-final-stabilization',
+    version: 'v10-crud-ready',
     deployed_at: new Date().toISOString(),
-    message: 'Se você está vendo isso, o deploy FUNCIONOU!'
+    message: 'Sistema de Blog e CRUDs administrativos ativados com sucesso.'
   });
 });
 
 import cors from 'cors';
-import { env } from './config/env.js';
+import { env } from './config/env';
 import { isOriginAllowed } from './config/cors.js';
 
 // 1. CORS Middleware (CARREGAR NO TOPO)
@@ -78,6 +83,7 @@ import pharmacyRoutes from './routes/pharmacy.routes.js';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { ChurnPreventionJobs } from './jobs/churn-prevention.job.js';
 import { NPSAnalysisJobs } from './jobs/nps-analysis.job.js';
+import { GrowthEngineJobs } from './jobs/growth-engine.job.js';
 
 // --- Config & Services ---
 import i18next, { middleware as i18nMiddleware } from './config/i18n.js';
@@ -91,15 +97,10 @@ import { startHealthJourneyJob } from './jobs/health-journey.job.js';
 import { FinanceJob } from './jobs/finance.job.js';
 import prisma from './lib/prisma.js';
 import { performanceLogger } from './middleware/logger.middleware.js';
+import { checkRedisHealth } from './lib/redis.js';
 
 const httpServer = createServer(app);
-
-// Inicializa Sockets
-SocketService.init(httpServer);
-const PORT = process.env.PORT || 3001;
-
-// Init Jobs (Phase 5 Finance)
-FinanceJob.start();
+const PORT = Number(process.env.PORT) || 3001;
 
 app.get('/', (_req, res) => {
   return res.status(200).json({
@@ -108,15 +109,21 @@ app.get('/', (_req, res) => {
   });
 });
 
+// Ignorar requisições de favicon para não sujar os logs (Topico 2)
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
+
 // 2. Security & Limiters
 app.use(helmet({
+  frameguard: false, // Permite iframes para Telemedicina
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://*.daily.co"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://*.docton.com.br", "https://*.doctonsaude.com.br", "http://localhost:3001"],
+      connectSrc: ["'self'", "https://*.docton.com.br", "https://*.doctonsaude.com.br", "http://localhost:3001", "http://localhost:3006", "https://*.daily.co"],
+      frameSrc: ["'self'", "https://*.daily.co"],
     },
   },
 }));
@@ -143,8 +150,8 @@ app.use('/api/auth', authLimiter);
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 // Middleware de captura de erro de JSON malformado
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  if (err instanceof SyntaxError && 'status' in err && (err as any).status === 400 && 'body' in err) {
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof SyntaxError && 'status' in err && (err as unknown as { status: number }).status === 400 && 'body' in err) {
     logger.error('[JSON Parse Error] Payload malformado detectado:', {
       error: err.message,
       ip: req.ip,
@@ -205,17 +212,22 @@ app.get('/api/health', async (_req, res) => {
     // Usamos $queryRaw para SELECT 1 pois $executeRaw causa erro ao retornar resultados
     await prisma.$queryRaw`SELECT 1`;
     dbStatus = 'up';
-  } catch (err: any) {
-    logger.error('Database health check failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('Database health check failed:', err instanceof Error ? err.message : String(err));
     dbStatus = 'down';
   }
+
+  const redisHealth = await checkRedisHealth();
+
   res.json({
     status: 'ok',
     db: dbStatus,
+    redis: redisHealth.status,
+    redis_message: redisHealth.message,
     dbUrl: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:([^@]+)@/, ':****@') : 'MISSING',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    build_id: "v8-final-stabilization"
+    build_id: "v10-admin-quotes-crud"
   });
 });
 
@@ -239,9 +251,13 @@ app.use((req, res) => {
   });
 });
 
-let server: any;
+let server: Server | undefined;
 
 export const startServer = () => {
+  console.log('--- Initializing Sockets & Jobs ---');
+  SocketService.init(httpServer);
+  // FinanceJob.start();
+
   console.log('--- Registering Connectors ---');
   try {
     registerPharmacyConnector();
@@ -253,19 +269,37 @@ export const startServer = () => {
   console.log('--- Connectors Registered ---');
 
   try {
-    if (env.REDIS_URL) {
+    GrowthEngineJobs.startAllJobs();
+  } catch (err) {
+    console.error('❌ Failed to start Growth Engine Jobs:', err);
+  }
+
+  try {
+    // Temporarily disabled due to Redis version incompatibility
+    /*
+    if (env.REDIS_URL && process.env.DISABLE_REDIS_WORKERS !== 'true') {
       startPharmacyQuotesWorker();
       console.log('✅ Pharmacy Quotes Worker initialized');
     } else {
-      console.log('ℹ️  REDIS_URL not configured; Pharmacy Quotes Worker disabled');
+      console.log('ℹ️  REDIS_URL not configured or workers disabled; Pharmacy Quotes Worker disabled');
     }
+    */
+    console.log('ℹ️  REDIS Workers disabled for testing');
   } catch (err) {
     console.error('❌ Failed to initialize Pharmacy Quotes Worker', err);
   }
 
-  server = httpServer.listen(PORT, () => {
-    logger.info(`🚀 Server running on http://localhost:${PORT}`);
+  server = httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`2026-04-16 ${new Date().toLocaleTimeString()} [info]: 🚀 Server running on http://0.0.0.0:${PORT}`);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('PUBLIC_PORT:', process.env.PUBLIC_PORT);
+
     initializeNotifications(server);
+
+    // CRON JOBS DELEGADOS PARA O N8N (MOTOR DE ORQUESTRAÇÃO)
+    // Desativado no backend: o n8n será responsável por processos como 
+    // Lembretes D-1, Recuperação de Farmácia e Churn, via consulta no Supabase.
+    /*
     if (env.ENABLE_CRON_JOBS) {
       console.log('🔄 Starting Cron Jobs...');
       ChurnPreventionJobs.startAllJobs();
@@ -276,8 +310,9 @@ export const startServer = () => {
       setInterval(() => medicationSubscriptionService.processDueSubscriptions(), 24 * 60 * 60 * 1000);
       console.log('✅ Cron Jobs initialized');
     }
+    */
   });
-  server.on('error', (err: any) => {
+  server.on('error', (err: Error) => {
     console.error(`❌ Failed to start server on port ${PORT}`);
     console.error(err);
     process.exit(1);
@@ -288,7 +323,7 @@ export const startServer = () => {
 export const stopServer = async () => {
   if (server) {
     return new Promise<void>((resolve, reject) => {
-      server.close((err: any) => {
+      server.close((err?: Error) => {
         if (err) return reject(err);
         resolve();
       });
@@ -299,6 +334,7 @@ export const stopServer = async () => {
 if (process.env.NODE_ENV !== 'test') {
   console.log('--- Calling startServer() ---');
 
+  /*
   try {
     import('./jobs/performance-snapshots.job.js').then(({ performanceSnapshotJob }) => {
       performanceSnapshotJob.start();
@@ -331,6 +367,7 @@ if (process.env.NODE_ENV !== 'test') {
   } catch (error) {
     console.error('[Server] Failed to start OCR maintenance jobs:', error);
   }
+  */
 
   startServer();
 }

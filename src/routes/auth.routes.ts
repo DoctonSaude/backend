@@ -12,6 +12,7 @@ import { sendEmail } from '../services/email.service.js';
 import inAppNotificationService from '../services/inAppNotification.service.js';
 import { supabase } from '../lib/supabase.js';
 import { AuditService } from '../services/audit.service.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -54,30 +55,34 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
     if (!email) return res.status(400).json({ error: 'Email é obrigatório' });
     const ip = (req.headers['x-forwarded-for'] as string) || req.ip || '127.0.0.1';
 
-    const isAdminBypass = env.ADMIN_DEV_BYPASS && email === 'rodrigo.vilela@docton.com' && password === '123456';
+    // Admin bypass for development only - uses environment variables only
+    if (env.ADMIN_DEV_BYPASS && env.NODE_ENV === 'development') {
+      const bypassEmail = process.env.ADMIN_DEV_BYPASS_EMAIL;
+      const bypassPassword = process.env.ADMIN_DEV_BYPASS_PASSWORD;
 
-    if (isAdminBypass) {
-      logger.info('[auth] Admin bypass used for login', { email, ip });
-      const devUser: any = {
-        id: env.ADMIN_DEV_USER_ID,
-        email: 'rodrigo.vilela@docton.com',
-        name: 'Rodrigo Vilela',
-        role: 'ADMIN',
-        emailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      if (bypassEmail && bypassPassword && email === bypassEmail && password === bypassPassword) {
+        logger.info('[auth] Admin bypass used for login', { email, ip });
+        const devUser: any = {
+          id: env.ADMIN_DEV_USER_ID,
+          email: bypassEmail,
+          name: 'Development Admin',
+          role: 'ADMIN',
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
 
-      const token = jwt.sign(
-        { userId: devUser.id, role: devUser.role, email: devUser.email },
-        String(env.JWT_SECRET),
-        { expiresIn: env.JWT_EXPIRES_IN as any }
-      );
+        const token = jwt.sign(
+          { userId: devUser.id, role: devUser.role, email: devUser.email },
+          String(env.JWT_SECRET),
+          { expiresIn: env.JWT_EXPIRES_IN as any }
+        );
 
-      const { password: _pw, ...userWithoutPassword } = devUser;
+        const { password: _pw, ...userWithoutPassword } = devUser;
 
-      await AuditService.logAuth(devUser.id, 'LOGIN', ip, 'SUCCESS');
-      return res.json({ user: userWithoutPassword, token });
+        AuditService.logAuth(devUser.id, 'LOGIN', ip, 'SUCCESS').catch(err => logger.error('Audit log failed:', err));
+        return res.json({ user: userWithoutPassword, token });
+      }
     }
 
     logger.debug('[auth] Normal login attempt', { email, ip });
@@ -127,53 +132,34 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
 
     // Anexar status de aprovação e tipo de parceiro
     if (user.role === 'PARTNER') {
-      const partner = user.partner || await prisma.partner.findUnique({ 
-        where: { userId: user.id },
-        select: {
-          id: true,
-          userId: true,
-          name: true,
-          specialty: true,
-          isApproved: true,
-          type: true
-        }
-      });
+      const partner = (user as any).Partner;
       (userWithoutPassword as any).isApproved = partner?.isApproved ?? false;
       (userWithoutPassword as any).partnerType = partner?.type ?? 'INDIVIDUAL';
     }
 
     // Anexar status de aprovação de farmácia
     if (user.role === 'PHARMACY') {
-      const pharmacy = user.pharmacy || await prisma.pharmacy.findFirst({ 
-        where: { users: { some: { id: user.id } } },
-        select: { id: true, isApproved: true, name: true }
-      });
+      const pharmacy = (user as any).Pharmacy;
       (userWithoutPassword as any).isApproved = pharmacy?.isApproved ?? false;
-      (userWithoutPassword as any).pharmacyName = pharmacy?.name ?? '';
+      (userWithoutPassword as any).pharmacyName = pharmacy?.reasonSocial ?? '';
     }
 
     // Anexar plano e onboarding se for PATIENT
     if (user.role === 'PATIENT') {
-      const patient = (user as any).patient || await prisma.patient.findUnique({
-        where: { userId: user.id },
-        include: {
-          subscriptions: {
-            where: { status: 'ACTIVE' },
-            take: 1,
-            include: { plan: { select: { key: true } } }
-          }
-        }
-      });
+      const patient = (user as any).Patient;
       (userWithoutPassword as any).onboardingCompleted = patient?.onboardingCompleted ?? false;
       
-      if (patient?.subscriptions?.[0]?.plan) {
-        (userWithoutPassword as any).plan = patient.subscriptions[0].plan.key;
+      // Prioridade: 1. planType (ex: Cortesia), 2. Subscription, 3. 'basic'
+      if (patient?.planType && patient.planType !== 'Gratuito' && patient.planType !== 'Básico') {
+        (userWithoutPassword as any).plan = patient.planType;
+      } else if (patient?.Subscription?.[0]?.Plan) {
+        (userWithoutPassword as any).plan = patient.Subscription[0].Plan.key;
       } else {
-        (userWithoutPassword as any).plan = 'basic';
+        (userWithoutPassword as any).plan = patient?.planType || 'basic';
       }
     }
 
-    await AuditService.logAuth(user.id, 'LOGIN', ip, 'SUCCESS');
+    AuditService.logAuth(user.id, 'LOGIN', ip, 'SUCCESS').catch(err => logger.error('Audit log failed:', err));
     res.json({ user: userWithoutPassword, token });
   } catch (err) {
     console.error('Login error:', err);
@@ -197,16 +183,16 @@ router.get('/validate', async (req: Request, res: Response, next: NextFunction) 
         const user = await prisma.user.findUnique({
           where: { id: userId },
           include: {
-            partner: {
+            Partner: {
               select: { id: true, isApproved: true, type: true }
             },
-            pharmacy: {
-              select: { id: true, isApproved: true, name: true }
+            Pharmacy: {
+              select: { id: true, isApproved: true, reasonSocial: true, logo: true, name: true }
             },
-            patient: {
+            Patient: {
               include: {
-                subscriptions: {
-                  include: { plan: true },
+                Subscription: {
+                  include: { Plan: true },
                   where: { status: 'ACTIVE' },
                   take: 1
                 }
@@ -223,25 +209,28 @@ router.get('/validate', async (req: Request, res: Response, next: NextFunction) 
 
         // Anexar status de aprovação e tipo de parceiro se for PARTNER
         if (user.role === 'PARTNER') {
-          (userWithoutPassword as any).isApproved = user.partner?.isApproved ?? false;
-          (userWithoutPassword as any).partnerType = user.partner?.type ?? 'INDIVIDUAL';
+          (userWithoutPassword as any).isApproved = (user as any).Partner?.isApproved ?? false;
+          (userWithoutPassword as any).partnerType = (user as any).Partner?.type ?? 'INDIVIDUAL';
         }
 
         // Anexar status de aprovação de farmácia
         if (user.role === 'PHARMACY') {
-          const isApproved = user.pharmacy?.isApproved || (user as any).isApproved || false;
+          const isApproved = (user as any).Pharmacy?.isApproved || (user as any).isApproved || false;
           (userWithoutPassword as any).isApproved = isApproved;
-          (userWithoutPassword as any).pharmacyName = user.pharmacy?.name ?? '';
+          (userWithoutPassword as any).pharmacyName = (user as any).Pharmacy?.reasonSocial ?? '';
         }
 
         // Anexar plano e onboarding se for PATIENT
         if (user.role === 'PATIENT') {
-          (userWithoutPassword as any).onboardingCompleted = user.patient?.onboardingCompleted ?? false;
+          (userWithoutPassword as any).onboardingCompleted = (user as any).Patient?.onboardingCompleted ?? false;
+          const patient = (user as any).Patient;
           
-          if (user.patient?.subscriptions?.[0]?.plan) {
-            (userWithoutPassword as any).plan = user.patient.subscriptions[0].plan.key;
+          if (patient?.planType && patient.planType !== 'Gratuito' && patient.planType !== 'Básico') {
+            (userWithoutPassword as any).plan = patient.planType;
+          } else if (patient?.Subscription?.[0]?.Plan) {
+            (userWithoutPassword as any).plan = patient.Subscription[0].Plan.key;
           } else {
-            (userWithoutPassword as any).plan = 'basic';
+            (userWithoutPassword as any).plan = patient?.planType || 'basic';
           }
         }
 
@@ -309,13 +298,16 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
     // Criar usuário e entidades relacionadas em uma transação para garantir integridade
     const result = await prisma.$transaction(async (tx) => {
       // 1. Criar o usuário
+      const userId = uuidv4();
       const newUser = await tx.user.create({
         data: {
+          id: userId,
           email,
           password: hashedPassword,
           name,
           role,
-          phone
+          phone,
+          updatedAt: new Date()
         }
       });
 
@@ -326,12 +318,15 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
       // 2. Criar entidades específicas baseadas no role
       if (role === 'PHARMACY') {
         const { pharmacyName, cnpj } = req.body;
+        const pharmacyId = uuidv4();
         pharmacy = await tx.pharmacy.create({
           data: {
-            name: pharmacyName || name,
-            cnpj: cnpj || null,
-            isApproved: false
-          }
+            id: pharmacyId,
+            name: String(pharmacyName || name),
+            cnpj: cnpj ? String(cnpj) : null,
+            isApproved: false,
+            updatedAt: new Date()
+          } as any
         });
 
         // Vincular o usuário à farmácia recém-criada
@@ -341,24 +336,30 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         });
       } else if (role === 'PARTNER') {
         const { cnpj, specialty, partnerType = 'INDIVIDUAL' } = req.body;
+        const partnerId = uuidv4();
         partner = await tx.partner.create({
           data: {
+            id: partnerId,
             userId: newUser.id,
             name: newUser.name,
             type: partnerType,
             cnpj: cnpj || null,
             specialty: specialty || null,
             specialties: specialty ? [specialty] : [],
-            isApproved: false
+            isApproved: false,
+            updatedAt: new Date()
           }
         });
       } else if (role === 'PATIENT') {
         const tempCpf = `TEMP-${Date.now()}`;
+        const patientId = uuidv4();
         patient = await tx.patient.create({
           data: {
+            id: patientId,
             userId: newUser.id,
             cpf: tempCpf,
             birthDate: new Date(),
+            updatedAt: new Date(),
           }
         });
       }
@@ -400,26 +401,11 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
       }).catch(err => logger.error('Erro ao notificar admin sobre novo paciente:', err));
     }
 
-    /*
-    // Enviar email de verificação (não-bloqueante)
-    try {
-      if (newUser && email) {
-        await sendEmail({
-          to: email,
-          subject: 'Verifique seu email - Docton Saúde',
-          template: 'email-verification',
-          data: { name, email, verificationUrl },
-        }).catch(err => logger.error('[auth] Erro no catch do sendEmail:', err));
-      }
-    } catch (emailError) {
-      logger.error('[auth] Erro ao enviar email de verificação (não-bloqueante):', emailError);
-    }
-    */
     logger.info('[auth] Email de verificação ignorado (Temporário)');
 
     const updatedUser = await prisma.user.findUnique({
       where: { id: newUser.id },
-      include: { pharmacy: true, partner: true, patient: true }
+      include: { Pharmacy: true, Partner: true, Patient: true } as any
     });
 
     const { password: _, ...userWithoutPassword } = updatedUser || newUser;

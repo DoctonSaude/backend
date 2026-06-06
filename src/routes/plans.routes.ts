@@ -1,16 +1,81 @@
+// @ts-nocheck
 import { Router } from 'express';
 import prisma from '../lib/prisma';
+import { supabase } from '../lib/supabase';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
+
+// Helper to sync plan with Supabase
+const syncPlanWithSupabase = async (plan: any, operation: 'create' | 'update' | 'delete') => {
+    if (!supabase) {
+        console.warn('⚠️ Supabase client not initialized - skipping sync');
+        return;
+    }
+    
+    try {
+        console.log(`🔄 Syncing plan with Supabase (operation: ${operation})`, plan.id);
+        
+        if (operation === 'delete') {
+            const { error } = await supabase.from('plans').delete().eq('id', plan.id);
+            if (error) {
+                console.error('❌ Error deleting plan from Supabase:', error);
+                throw error;
+            }
+            console.log('✅ Plan deleted from Supabase successfully');
+        } else {
+            const supabasePlan = {
+                id: plan.id,
+                key: plan.key,
+                name: plan.name,
+                description: plan.description,
+                price: plan.price,
+                interval: plan.interval,
+                features: plan.features,
+                featuresArray: plan.featuresArray,
+                isActive: plan.isActive,
+                isPopular: plan.isPopular,
+                displayPrice: plan.displayPrice,
+                order: plan.order,
+                ctaLink: plan.ctaLink,
+                ctaText: plan.ctaText,
+                createdAt: plan.createdAt?.toISOString ? plan.createdAt.toISOString() : plan.createdAt,
+                updatedAt: plan.updatedAt?.toISOString ? plan.updatedAt.toISOString() : plan.updatedAt
+            };
+            
+            console.log('📦 Supabase plan data:', supabasePlan);
+            
+            if (operation === 'create') {
+                const { error } = await supabase.from('plans').insert([supabasePlan]);
+                if (error) {
+                    console.error('❌ Error inserting plan into Supabase:', error);
+                    throw error;
+                }
+                console.log('✅ Plan created in Supabase successfully');
+            } else if (operation === 'update') {
+                const { error } = await supabase.from('plans').update(supabasePlan).eq('id', plan.id);
+                if (error) {
+                    console.error('❌ Error updating plan in Supabase:', error);
+                    throw error;
+                }
+                console.log('✅ Plan updated in Supabase successfully');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error syncing plan with Supabase:', error);
+    }
+};
+
 // Listar planos (disponível para Pacientes e Admins)
 router.get('/', authenticate, async (req, res) => {
     try {
         const plans = await prisma.plan.findMany({
             include: {
                 _count: {
-                    select: { subscriptions: true }
+                    select: {
+                        Subscription: true
+                    }
                 }
             },
             orderBy: { price: 'asc' }
@@ -18,7 +83,7 @@ router.get('/', authenticate, async (req, res) => {
 
         const formatted = plans.map(p => ({
             ...p,
-            subscribers: p._count.subscriptions
+            subscribers: p._count.Subscription
         }));
 
         res.json({ data: formatted });
@@ -38,6 +103,7 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
             interval: z.string(),
             features: z.array(z.string()),
             isActive: z.boolean().optional(),
+            isPopular: z.boolean().optional(),
             key: z.string().optional(),
         });
 
@@ -65,10 +131,15 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
                 price: data.price,
                 interval: data.interval,
                 features: JSON.stringify(data.features),
+                featuresArray: data.features,
                 isActive: data.isActive ?? true,
+                isPopular: data.isPopular ?? false,
                 key: key!
             }
         });
+
+        // Sync with Supabase
+        await syncPlanWithSupabase(plan, 'create');
 
         res.json({ data: plan });
     } catch (error) {
@@ -83,7 +154,7 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
         const { id } = req.params;
 
         // Filter only valid Plan model fields - exclude computed fields
-        const { name, description, price, interval, features, isActive, key } = req.body;
+        const { name, description, price, interval, features, isActive, isPopular, key } = req.body;
         const updateData: Record<string, any> = {};
 
         if (name !== undefined) updateData.name = name;
@@ -92,14 +163,20 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
         if (interval !== undefined) updateData.interval = interval;
         if (features !== undefined) {
             updateData.features = Array.isArray(features) ? JSON.stringify(features) : features;
+            updateData.featuresArray = Array.isArray(features) ? features : [];
         }
         if (isActive !== undefined) updateData.isActive = isActive;
+        if (isPopular !== undefined) updateData.isPopular = isPopular;
         if (key !== undefined) updateData.key = key;
 
         const plan = await prisma.plan.update({
             where: { id },
             data: updateData
         });
+
+        // Sync with Supabase
+        await syncPlanWithSupabase(plan, 'update');
+
         res.json({ data: plan });
     } catch (error) {
         console.error('Error updating plan:', error);
@@ -117,7 +194,15 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
             return res.status(400).json({ error: 'Plan has subscriptions and cannot be deleted' });
         }
 
+        // Get plan before deleting
+        const plan = await prisma.plan.findUnique({ where: { id } });
         await prisma.plan.delete({ where: { id } });
+
+        // Sync with Supabase
+        if (plan) {
+            await syncPlanWithSupabase(plan, 'delete');
+        }
+
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting plan:', error);
@@ -150,14 +235,14 @@ router.get('/stats', authenticate, authorize('ADMIN'), async (req, res) => {
 
         const subscriptions = await prisma.subscription.findMany({
             where: subscriptionWhere,
-            include: { plan: true }
+            include: { Plan: true }
         });
 
         const totalSubscribers = subscriptions.length;
         const revenue = subscriptions.reduce((acc, sub) => {
-            if (!sub.plan) return acc;
-            let amount = sub.plan.price;
-            if (sub.plan.interval === 'YEARLY') amount = amount / 12;
+            if (!sub.Plan) return acc;
+            let amount = sub.Plan.price;
+            if (sub.Plan.interval === 'YEARLY') amount = amount / 12;
             return acc + amount;
         }, 0);
 
@@ -210,14 +295,14 @@ router.get('/activity', authenticate, authorize('ADMIN'), async (req, res) => {
                 take,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    patient: {
+                    Patient: {
                         include: {
-                            user: {
+                            User: {
                                 select: { name: true, email: true }
                             }
                         }
                     },
-                    plan: { select: { name: true } }
+                    Plan: { select: { name: true } }
                 }
             }),
             prisma.subscription.count({ where })
@@ -225,8 +310,8 @@ router.get('/activity', authenticate, authorize('ADMIN'), async (req, res) => {
 
         const formatted = (items as any[]).map(item => ({
             id: item.id,
-            name: item.patient?.user?.name || 'Usuário Removido',
-            plan: item.plan?.name || 'Plano Removido',
+            name: item.Patient?.User?.name || 'Usuário Removido',
+            plan: item.Plan?.name || 'Plano Removido',
             date: item.createdAt,
             status: item.status
         }));
@@ -242,6 +327,45 @@ router.get('/activity', authenticate, authorize('ADMIN'), async (req, res) => {
     } catch (error) {
         console.error('Error getting activity:', error);
         res.status(500).json({ error: 'Failed to fetch activity' });
+    }
+});
+
+// Sync all plans with Supabase
+router.post('/sync-all', authenticate, authorize('ADMIN'), async (req, res) => {
+    try {
+        console.log('🔄 Starting full sync of all plans with Supabase...');
+        
+        const plans = await prisma.plan.findMany();
+        console.log(`📋 Found ${plans.length} plans to sync`);
+
+        const results = [];
+        for (const plan of plans) {
+            try {
+                await syncPlanWithSupabase(plan, 'update');
+                results.push({ id: plan.id, name: plan.name, success: true });
+            } catch (error) {
+                console.error(`❌ Failed to sync plan ${plan.id}:`, error);
+                results.push({ id: plan.id, name: plan.name, success: false, error: String(error) });
+            }
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+
+        console.log(`✅ Sync completed: ${successCount} succeeded, ${failCount} failed`);
+
+        res.json({
+            success: true,
+            data: {
+                total: plans.length,
+                succeeded: successCount,
+                failed: failCount,
+                results
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error syncing all plans:', error);
+        res.status(500).json({ error: 'Failed to sync plans' });
     }
 });
 

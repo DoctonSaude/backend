@@ -12,7 +12,8 @@ export const performanceLogger = (req: Request, res: Response, next: NextFunctio
 
         const logMessage = `${method} ${originalUrl} ${statusCode} - ${duration}ms`;
 
-        if (duration > 500) {
+        // Aumentado o limite pra 2000ms pra evitar alarmes falsos de "Cold Start" (Topico 1)
+        if (duration > 2000) {
             logger.warn(`🐌 SLOW REQUEST: ${logMessage}`, {
                 method,
                 url: originalUrl,

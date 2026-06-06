@@ -9,9 +9,9 @@ export class PharmacyPerformanceService {
         const pharmacy = await (prisma as any).pharmacy.findUnique({
             where: { id: pharmacyId },
             include: {
-                users: {
+                User: {
                     include: {
-                        partner: {
+                        Partner: {
                             include: {
                                 subscription: {
                                     include: { plan: true }
@@ -36,7 +36,7 @@ export class PharmacyPerformanceService {
             this.calculateDistanceScore(pharmacy, patientLocation) :
             (pharmacy as any).distanceScore || 0.5;
         // 5. Score de Plano (15%)
-        const planScore = this.calculatePlanScore(pharmacy.users[0]?.partner?.subscription?.plan?.name);
+        const planScore = this.calculatePlanScore(pharmacy.User?.[0]?.Partner?.subscription?.plan?.name);
         // Calcular score geral (média ponderada)
         const overallScore = responseTimeScore * (PEDOMED_CONFIG.PERFORMANCE_SCORE.WEIGHTS as any).RESPONSE_TIME +
             responseRateScore * (PEDOMED_CONFIG.PERFORMANCE_SCORE.WEIGHTS as any).RESPONSE_RATE +

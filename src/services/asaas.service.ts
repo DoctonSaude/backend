@@ -3,19 +3,23 @@
  * Integração com o gateway de pagamento Asaas (sandbox + produção)
  * Documentação: https://docs.asaas.com
  */
-const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL || 'https://sandbox.asaas.com/api/v3';
-const ASAAS_API_KEY = process.env.ASAAS_API_KEY || '';
-
 class AsaasService {
-    headers;
+    private baseUrl: string;
+    private apiKey: string;
+    
     constructor() {
-        this.headers = {
+        this.baseUrl = process.env.ASAAS_BASE_URL || 'https://sandbox.asaas.com/api/v3';
+        this.apiKey = process.env.ASAAS_API_KEY || '';
+    }
+
+    private get headers() {
+        return {
             'Content-Type': 'application/json',
-            'access_token': ASAAS_API_KEY
+            'access_token': this.apiKey
         };
     }
     async request(method: string, path: string, body?: any) {
-        const url = `${ASAAS_BASE_URL}${path}`;
+        const url = `${this.baseUrl}${path}`;
         const response = await fetch(url, {
             method,
             headers: this.headers,
@@ -33,7 +37,7 @@ class AsaasService {
      * Cria ou reutiliza um cliente no Asaas.
      * Busca pelo cpfCnpj para evitar duplicatas.
      */
-    async getOrCreateCustomer(params) {
+    async getOrCreateCustomer(params: any) {
         // Tenta buscar cliente existente pelo CPF/CNPJ
         const search = await this.request('GET', `/customers?cpfCnpj=${params.cpfCnpj.replace(/\D/g, '')}`);
         if (search.data && search.data.length > 0) {
@@ -55,7 +59,7 @@ class AsaasService {
      * Cria uma cobrança PIX no Asaas.
      * Retorna a cobrança com QR Code embutido.
      */
-    async createPixCharge(params) {
+    async createPixCharge(params: any) {
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + (params.dueDateDays ?? 1));
         const dueDateStr = dueDate.toISOString().split('T')[0];
@@ -78,18 +82,32 @@ class AsaasService {
     /**
      * Cria uma cobrança de cartão de crédito (link de pagamento).
      */
-    async createCardCharge(params) {
+    async createCardCharge(params: {
+        customerId: string;
+        value: number;
+        description: string;
+        externalReference?: string;
+        installmentCount?: number;
+    }) {
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 1);
-        return this.request('POST', '/payments', {
+        
+        const body: any = {
             customer: params.customerId,
             billingType: 'CREDIT_CARD',
             value: params.value,
             dueDate: dueDate.toISOString().split('T')[0],
             description: params.description,
-            externalReference: params.externalReference,
-            installmentCount: params.installmentCount || 1
-        });
+            externalReference: params.externalReference
+        };
+
+        // Se houver parcelas (mais de 1), adiciona o count. 
+        // Para pagamento à vista (1), remover o campo evita o erro 400 do Asaas.
+        if (params.installmentCount && params.installmentCount > 1) {
+            body.installmentCount = params.installmentCount;
+        }
+
+        return this.request('POST', '/payments', body);
     }
     /**
      * Consulta o status de uma cobrança.
@@ -102,7 +120,7 @@ class AsaasService {
      * Realiza uma transferência (repasse) via PIX ou TED para um parceiro.
      * Usado após confirmação de pagamento do paciente.
      */
-    async createTransfer(params) {
+    async createTransfer(params: any) {
         let body: any = {
             value: params.value,
             description: params.description,

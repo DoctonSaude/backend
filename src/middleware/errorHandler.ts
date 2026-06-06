@@ -168,6 +168,7 @@ export const errorHandler = (err: Error | AppError, req: Request, res: Response,
     const isDataEndpoint = req.path.includes('/auth/validate') ||
                            req.path.includes('/dashboard') ||
                            req.path.includes('/loyalty') ||
+                           req.path.includes('/gamification') ||
                            req.path.includes('/notifications') ||
                            req.path.includes('/analytics');
 
@@ -245,8 +246,9 @@ export const errorHandler = (err: Error | AppError, req: Request, res: Response,
   logError(err, req);
 
   // Se for um erro operacional conhecido
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
+  if (err instanceof AppError || (err as any).statusCode) {
+    const statusCode = (err as any).statusCode || (err instanceof AppError ? err.statusCode : 500);
+    return res.status(statusCode).json({
       status: 'error',
       message: err.message,
       ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })

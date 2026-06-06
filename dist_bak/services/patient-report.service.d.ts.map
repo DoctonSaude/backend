@@ -1,0 +1,1 @@
+{"version":3,"file":"patient-report.service.d.ts","sourceRoot":"","sources":["../../src/services/patient-report.service.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,MAAM,EAAE,MAAM,QAAQ,CAAC;AAIhC,qBAAa,oBAAoB;IAC7B,OAAO,CAAC,MAAM,CAAC,SAAS,CAAuE;WAElF,wBAAwB,CAAC,SAAS,EAAE,MAAM,GAAG,OAAO,CAAC,MAAM,CAAC;IAkHzE,OAAO,CAAC,MAAM,CAAC,aAAa;CAK/B"}

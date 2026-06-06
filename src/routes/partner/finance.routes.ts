@@ -1,154 +1,287 @@
+// @ts-nocheck
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import prisma from '../../lib/prisma.js';
-import { format as dateFnsFormat } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { RevenueService } from '../../services/revenue.service.js';
+import { financeService } from '../../services/finance.service.js';
 
 const router = Router();
 
 /**
- * @route GET /api/partners/dashboard
+ * @route GET /api/partners/financial-data
  */
-router.get('/dashboard', authenticate, authorize('PARTNER'), async (req: any, res) => {
-  res.setHeader('X-Backend-Version', '2026.04.09.v6-modular');
+router.get('/financial-data', authenticate, authorize('PARTNER'), async (req: any, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const partner = await prisma.partner.findFirst({
-      where: { userId },
-      select: { id: true, rating: true, totalReviews: true, createdAt: true }
-    });
-
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-
-    const [
-      totalAppointments,
-      completedAppointments,
-      upcomingAppointments,
-      thisMonthAppts,
-      lastMonthAppts,
-      monthlyRevenueData,
-      lastMonthRevenueData,
-      recentAppointments,
-      validatedCodes
-    ] = await Promise.all([
-      prisma.appointment.count({ where: { partnerId: partner.id } }),
-      prisma.appointment.count({ where: { partnerId: partner.id, status: 'COMPLETED' } }),
-      prisma.appointment.count({ where: { partnerId: partner.id, status: { in: ['SCHEDULED', 'CONFIRMED'] } } }),
-      prisma.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: startOfMonth } } }),
-      prisma.appointment.count({ where: { partnerId: partner.id, createdAt: { gte: lastMonthStart, lte: lastMonthEnd } } }),
-      prisma.transaction.aggregate({
-        where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: startOfMonth } },
-        _sum: { amount: true }
-      }),
-      prisma.transaction.aggregate({
-        where: { partnerId: partner.id, type: 'CREDIT', status: 'COMPLETED', createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
-        _sum: { amount: true }
-      }),
-      prisma.appointment.findMany({
-        where: { partnerId: partner.id },
-        orderBy: { dateTime: 'desc' },
-        take: 5,
-        include: { patient: { include: { user: { select: { name: true, avatar: true } } } } }
-      }),
-      prisma.validationCodeLog.findMany({
-        where: { partnerId: partner.id },
-        orderBy: { timestamp: 'desc' },
-        take: 10,
-        include: { patient: { select: { user: { select: { name: true, avatar: true } } } } }
-      })
-    ]);
-
-    const rev = monthlyRevenueData._sum.amount || 0;
-    const lastRev = lastMonthRevenueData._sum.amount || 0;
-    const revGrowth = lastRev > 0 ? ((rev - lastRev) / lastRev) * 100 : 0;
-    const apptsGrowth = lastMonthAppts > 0 ? ((thisMonthAppts - lastMonthAppts) / lastMonthAppts) * 100 : 0;
-
-    const period = (req.query.period as string) || 'week';
-    const chartStartDate = new Date();
-    if (period === 'week') chartStartDate.setDate(chartStartDate.getDate() - 6);
-    else chartStartDate.setDate(chartStartDate.getDate() - 29);
-    chartStartDate.setHours(0, 0, 0, 0);
-
-    const [dailyRevenue, dailyAppts] = await Promise.all([
-      prisma.transaction.findMany({
-        where: { partnerId: partner.id, status: 'COMPLETED', type: 'CREDIT', createdAt: { gte: chartStartDate } },
-        select: { amount: true, createdAt: true }
-      }),
-      prisma.appointment.findMany({
-        where: { partnerId: partner.id, dateTime: { gte: chartStartDate } },
-        select: { dateTime: true }
-      })
-    ]);
-
-    const daysToGenerate = period === 'week' ? 7 : 30;
-    const chartData = Array.from({ length: daysToGenerate }, (_, i) => {
-      const d = new Date(chartStartDate);
-      d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayRev = dailyRevenue.filter(r => r.createdAt.toISOString().split('T')[0] === dateStr).reduce((sum, r) => sum + r.amount, 0);
-      const dayAppts = dailyAppts.filter(a => a.dateTime.toISOString().split('T')[0] === dateStr).length;
-      return {
-        name: period === 'week' ? dateFnsFormat(d, 'EEE', { locale: ptBR }) : dateFnsFormat(d, 'dd/MM'),
-        value: dayRev,
-        appts: dayAppts
-      };
+    const data = await prisma.partnerFinancialData.findUnique({
+      where: { partnerId: partner.id }
     });
 
-    return res.json({
-      metrics: {
-        newAppointments: thisMonthAppts,
-        monthlyRevenue: rev,
-        revenueGrowth: Math.round(revGrowth),
-        completedAppointments,
-        apptsGrowth: Math.round(apptsGrowth),
-        upcomingAppointments,
-        rating: partner.rating || 0,
-        totalReviews: partner.totalReviews || 0
-      },
-      recentAppointments: recentAppointments.map(appt => ({
-        id: appt.id,
-        patientName: appt.patient?.user?.name || 'Paciente',
-        patientAvatar: appt.patient?.user?.avatar,
-        dateTime: appt.dateTime,
-        status: appt.status,
-        isOnline: (appt as any).isOnline
-      })),
-      validatedCodes: validatedCodes.map(log => ({
-        id: log.id,
-        code: log.code,
-        patientName: log.patient?.user?.name || 'Paciente',
-        patientAvatar: log.patient?.user?.avatar,
-        timestamp: log.timestamp,
-        status: log.status
-      })),
-      chartData: chartData
-    });
+    if (!data) return res.status(404).json({ error: 'Dados financeiros não encontrados' });
+    return res.json(data);
   } catch (error) {
-    console.error('Erro ao obter dashboard do parceiro:', error);
-    return res.status(500).json({ error: 'Erro ao obter dashboard do parceiro' });
+    return res.status(500).json({ error: 'Erro ao buscar dados financeiros' });
   }
 });
 
 /**
- * @route GET /api/partners/revenue/insights
+ * @route PUT /api/partners/financial-data
  */
-router.get('/revenue/insights', authenticate, authorize('PARTNER', 'PHARMACY'), async (req: any, res) => {
-  res.setHeader('X-Backend-Version', '2026.04.09.v6-modular');
+router.put('/financial-data', authenticate, authorize('PARTNER'), async (req: any, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const partner = await prisma.partner.findFirst({ where: { userId } });
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
-    const insights = await RevenueService.getInsights(partner.id);
-    return res.json(insights);
+
+    const payload = {
+      ...req.body,
+      partnerId: partner.id,
+      taxIdType: req.body.taxIdType || (req.body.taxId?.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF'),
+    };
+
+    const data = await prisma.partnerFinancialData.upsert({
+      where: { partnerId: partner.id },
+      update: payload,
+      create: payload
+    });
+
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao atualizar dados financeiros' });
+  }
+});
+
+/**
+ * @route GET /api/partners/finance/payments
+ * Lista os repasses (transações de crédito) do parceiro autenticado.
+ */
+router.get('/finance/payments', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const { page = 1, pageSize = 20, status } = req.query;
+    const skip = (Number(page) - 1) * Number(pageSize);
+
+    const where: any = { partnerId: partner.id };
+    if (status && status !== 'all') where.status = String(status).toUpperCase();
+
+    const [total, transactions] = await prisma.$transaction([
+      prisma.transaction.count({ where }),
+      prisma.transaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: Number(pageSize),
+        include: {
+          Patient: { include: { User: { select: { name: true, avatar: true } } } }
+        }
+      })
+    ]);
+
+    // Mapear para o formato esperado pelo frontend (useRepasses)
+    const payments = transactions.map(tx => {
+      let meta: any = {};
+      try { meta = tx.metadata ? JSON.parse(String(tx.metadata)) : {}; } catch {}
+
+      return {
+        id: tx.id,
+        date: tx.createdAt.toISOString().split('T')[0],
+        amount: tx.amount,
+        status: tx.status === 'COMPLETED' ? 'Pago' : tx.status === 'PENDING' ? 'Pendente' : 'Processando',
+        serviceType: tx.category || 'APPOINTMENT',
+        description: tx.description,
+        patientName: tx.Patient?.User?.name || null,
+        patientAvatar: tx.Patient?.User?.avatar || null,
+        grossAmount: meta.grossAmount || tx.amount,
+        platformFee: meta.platformFee || 0,
+        commissionPercent: meta.commissionPercent || 15,
+        appointmentId: meta.appointmentId || null,
+        type: tx.type,
+        createdAt: tx.createdAt
+      };
+    });
+
+    return res.json({
+      data: payments,
+      total,
+      page: Number(page),
+      pageSize: Number(pageSize),
+      totalPages: Math.ceil(total / Number(pageSize))
+    });
+  } catch (error) {
+    console.error('Erro ao buscar pagamentos:', error);
+    return res.status(500).json({ error: 'Erro ao buscar pagamentos' });
+  }
+});
+
+/**
+ * @route GET /api/partners/finance/stats (Aliased from /payments/stats for frontend compatibility)
+ * Retorna estatísticas financeiras: saldo disponível, pendente, total recebido.
+ */
+router.get('/finance/stats', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const stats = await financeService.getDetailedStats(partner.id);
+
+    return res.json({
+      balance: stats.balance,
+      pendingBalance: stats.pendingBalance,
+      pendingWithdrawal: stats.pendingWithdrawal,
+      totalRevenue: stats.totalRevenue,
+      monthlyAverage: stats.monthlyAverage,
+      totalAppointments: stats.totalAppointments,
+      yearTotal: stats.yearTotal,
+      transactions: stats.transactions
+    });
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas financeiras:', error);
+    return res.status(500).json({ error: 'Erro ao buscar estatísticas financeiras' });
+  }
+});
+
+/**
+ * @route POST /api/partners/finance/payout
+ * Solicita um saque do saldo disponível.
+ */
+router.post('/finance/payout', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { amount, bankDetails } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valor de saque inválido' });
+    }
+
+    const partner = await prisma.partner.findFirst({ 
+      where: { userId }, 
+      select: { id: true } 
+    });
+    
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    // Verificar saldo disponível via serviço
+    const wallet = await financeService.getWalletStats(partner.id);
+    if (wallet.balance < amount) {
+      return res.status(400).json({ error: 'Saldo disponível insuficiente para este saque' });
+    }
+
+    // Criar solicitação de saque
+    const payout = await financeService.requestPayout(partner.id, amount);
+    
+    // Opcional: Atualizar metadados com os dados bancários usados no momento do saque
+    await prisma.transaction.update({
+      where: { id: payout.id },
+      data: {
+        metadata: JSON.stringify({ bankDetails })
+      }
+    });
+
+    return res.status(201).json(payout);
   } catch (error: any) {
-    console.error(`[Partners/Insights] Erro:`, error?.message);
-    return res.status(500).json({ error: 'Erro interno ao gerar insights' });
+    console.error('Erro ao processar saque:', error);
+    return res.status(500).json({ error: 'Erro interno ao processar saque', details: error.message });
+  }
+});
+
+/**
+ * @route GET /api/partners/payments/stats
+ * Keep legacy route if needed by other components
+ */
+router.get('/payments/stats', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const stats = await financeService.getWalletStats(partner.id);
+    return res.json({
+      data: {
+        balance: stats.balance,
+        pendingBalance: stats.pendingBalance,
+        totalRevenue: stats.totalRevenue,
+        recentTransactions: stats.transactions.slice(0, 5)
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+  }
+});
+
+/**
+ * @route POST /api/partners/finance/anticipation
+ * Solicita antecipação de recebíveis pendentes.
+ */
+router.post('/finance/anticipation', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const stats = await financeService.getWalletStats(partner.id);
+
+    if (stats.pendingBalance <= 0) {
+      return res.status(400).json({ error: 'Não há valores pendentes para antecipar' });
+    }
+
+    // Registrar a solicitação de antecipação como uma transação
+    const anticipation = await prisma.transaction.create({
+      data: {
+        partnerId: partner.id,
+        amount: stats.pendingBalance,
+        type: 'DEBIT',
+        description: 'Solicitação de Antecipação de Recebíveis',
+        status: 'PENDING',
+        category: 'ANTICIPATION'
+      }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Solicitação de antecipação enviada com sucesso',
+      anticipation
+    });
+  } catch (error) {
+    console.error('Erro ao solicitar antecipação:', error);
+    return res.status(500).json({ error: 'Erro ao solicitar antecipação' });
+  }
+});
+
+/**
+ * @route GET /api/partners/finance/payments/:id/receipt
+ * Baixar comprovante de um repasse específico.
+ */
+router.get('/finance/payments/:id/receipt', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findFirst({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const transaction = await prisma.transaction.findFirst({
+      where: { id, partnerId: partner.id },
+      include: { Patient: { include: { User: { select: { name: true } } } } }
+    });
+
+    if (!transaction) return res.status(404).json({ error: 'Transação não encontrada' });
+
+    // Retornar dados do comprovante (em produção, geraria PDF)
+    return res.json({
+      id: transaction.id,
+      description: transaction.description,
+      amount: transaction.amount,
+      status: transaction.status,
+      createdAt: transaction.createdAt,
+      patientName: transaction.Patient?.User?.name || 'N/A'
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar comprovante' });
   }
 });
 

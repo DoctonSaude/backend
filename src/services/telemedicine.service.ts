@@ -21,6 +21,7 @@ export class TelemedicineService {
         const expiresAt = Math.floor(Date.now() / 1000) + 3600 * 24; // 24h de validade
 
         try {
+            console.log(`[Telemedicine] Creating room for appointment: ${appointmentId}`);
             const response = await this.client.post('/rooms', {
                 name: roomName,
                 privacy: 'private',
@@ -30,6 +31,8 @@ export class TelemedicineService {
                     enable_chat: true,
                 },
             });
+
+            console.log(`[Telemedicine] Room created successfully: ${response.data.url}`);
 
             const session = await (prisma as any).telemedicineSession.upsert({
                 where: { appointmentId },
@@ -48,7 +51,10 @@ export class TelemedicineService {
 
             return session;
         } catch (error: any) {
+            console.error(`[Telemedicine] Error creating room in Daily:`, error.response?.data || error);
+
             if (error.response?.status === 400 && error.response?.data?.info?.includes('already exists')) {
+                console.log(`[Telemedicine] Room already exists, fetching existing room: ${roomName}`);
                 const getResponse = await this.client.get(`/rooms/${roomName}`);
                 return await (prisma as any).telemedicineSession.upsert({
                     where: { appointmentId },
@@ -61,7 +67,6 @@ export class TelemedicineService {
                     }
                 });
             }
-            console.error('Erro ao criar sala no Daily:', error.response?.data || error);
             throw new Error('Falha ao criar sala de telemedicina');
         }
     }

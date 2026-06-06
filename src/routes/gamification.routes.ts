@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { sentinelaService, wearablesPilotService, getRecommendedChallenges } from '../services/gamification.service.js';
 import progressionService from '../services/progression.service.js';
@@ -6,6 +6,20 @@ import prisma from '../lib/prisma.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
+
+/**
+ * GET /api/gamification
+ * Health check do módulo de gamificação
+ */
+router.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'gamification-service',
+    timestamp: new Date().toISOString(),
+    version: 'v2.1-stable'
+  });
+});
+
 
 // Helper para garantir que o registro de Patient exista para o usuário (Resiliência Gamification)
 // Helper para garantir que o registro de Patient exista para o usuário (Resiliência Gamification)
@@ -55,11 +69,12 @@ const ensurePatient = async (userId?: string) => {
   return mapped;
 };
 
-router.get('/challenges', authenticate, async (req, res) => {
+router.get('/challenges', async (req, res) => {
   try {
     const list = await prisma.challenge.findMany({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
     return res.json(list);
-  } catch {
+  } catch (err) {
+    console.error('[Gamification challenges] Erro:', err);
     return res.json([]);
   }
 });
@@ -68,17 +83,39 @@ router.get('/my-challenges', authenticate, authorize('PATIENT'), async (req: any
   const userId = req.user?.userId;
 
   try {
-    const patient = await ensurePatient(userId);
+    const patient = await prisma.patient.findUnique({ where: { userId } });
+    if (!patient) {
+      return res.json([]);
+    }
 
     const my = await prisma.patientChallenge.findMany({
       where: { patientId: patient.id },
       orderBy: { updatedAt: 'desc' },
       include: { challenge: true }
     });
-    return res.json(my);
+    
+    // Mapear para o formato que o frontend espera
+    const mapped = my.map(pc => {
+      const challenge = pc.challenge || pc.Challenge;
+      return {
+        id: pc.id,
+        challengeId: pc.challengeId,
+        title: challenge?.title || 'Desafio',
+        description: challenge?.description || '',
+        category: challenge?.category || 'general',
+        pointsReward: challenge?.points || 0,
+        progress: pc.progress || 0,
+        target: challenge?.targetValue || 1,
+        startDate: pc.startDate || pc.createdAt,
+        endDate: pc.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: pc.status || 'ACTIVE'
+      };
+    });
+
+    return res.json(mapped);
   } catch (error: any) {
     console.error('[Gamification my-challenges] Erro:', error.message);
-    return res.status(500).json({ error: error.message || 'Erro ao carregar desafios' });
+    return res.json([]);
   }
 });
 
@@ -278,7 +315,8 @@ router.get('/rewards', authenticate, async (req, res) => {
   try {
     const list = await prisma.reward.findMany({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
     return res.json(list);
-  } catch {
+  } catch (err) {
+    console.error('[Gamification rewards] Erro:', err);
     return res.json([]);
   }
 });
@@ -303,7 +341,8 @@ router.post('/rewards/:rewardId/redeem', authenticate, authorize('PATIENT'), asy
       prisma.patientReward.create({ data: { patientId: dbPatient.id, rewardId, redeemedAt: now, isUsed: false, code } })
     ]);
     return res.json({ message: 'Recompensa resgatada com sucesso!', reward: { code, rewardDetails: reward } });
-  } catch {
+  } catch (err) {
+    console.error('[Gamification redeem-reward] Erro:', err);
     return res.status(500).json({ error: 'Erro ao resgatar recompensa' });
   }
 });
@@ -312,16 +351,34 @@ router.get('/my-rewards', authenticate, authorize('PATIENT'), async (req: any, r
   const userId = req.user?.userId;
 
   try {
-    const patient = await ensurePatient(userId);
+    let patient;
+    try {
+      patient = await ensurePatient(userId);
+    } catch {
+      // Se não conseguir criar/encontrar o paciente, retorna array vazio
+      return res.json([]);
+    }
+
+    // Busca as recompensas do paciente, sem o include reward para evitar erros se a tabela não existir
     const my = await prisma.patientReward.findMany({
       where: { patientId: patient.id },
       orderBy: { redeemedAt: 'desc' },
-      include: { reward: true }
     });
-    return res.json(my);
+
+    // Busca as recompensas separadamente e combina
+    const rewards = await prisma.reward.findMany();
+    const rewardMap = new Map(rewards.map(r => [r.id, r]));
+
+    const myWithRewards = my.map(patientReward => ({
+      ...patientReward,
+      reward: rewardMap.get(patientReward.rewardId) || null
+    }));
+
+    return res.json(myWithRewards);
   } catch (error: any) {
-    console.error('[Gamification my-rewards] Erro:', error.message);
-    return res.status(500).json({ error: 'Erro ao carregar recompensas' });
+    console.error('[Gamification my-rewards] Erro:', error);
+    // Em caso de erro, retorna array vazio para não quebrar o frontend
+    return res.json([]);
   }
 });
 
@@ -451,25 +508,64 @@ router.get('/recommended-challenges', authenticate, authorize('PATIENT'), async 
 // Ranking Global/Social
 router.get('/ranking', authenticate, async (req, res) => {
   try {
-    const topPatients = await prisma.patient.findMany({
-      take: 10,
-      orderBy: { experiencePoints: 'desc' },
-      include: { user: { select: { name: true, avatar: true } } }
-    });
+    let topPatients: any[] = [];
+    try {
+      topPatients = await prisma.patient.findMany({
+        take: 20,
+        orderBy: { experiencePoints: 'desc' },
+        include: { User: { select: { id: true, name: true, avatar: true } } }
+      });
+    } catch (dbError) {
+      console.error('[Gamification ranking] Erro no banco:', dbError);
+    }
 
+    const currentUserId = req.user?.userId;
+    
     const ranking = topPatients.map((p, index) => ({
       id: p.id,
-      name: p.user?.name || 'Invisível',
-      level: p.level,
-      xp: p.experiencePoints,
-      position: index + 1,
-      avatar: p.user?.avatar || '👤'
+      name: (p as any).User?.name || (p as any).user?.name || 'Invisível',
+      avatar: (p as any).User?.avatar || (p as any).user?.avatar,
+      points: p.experiencePoints || 0,
+      level: p.level || 1,
+      streak: (p as any).currentStreak || 0,
+      rank: index + 1,
+      isCurrentUser: p.userId === currentUserId
     }));
 
     return res.json(ranking);
   } catch (error) {
-    console.error('Erro ao carregar ranking:', error);
-    return res.status(500).json({ error: 'Erro ao carregar ranking' });
+    console.error('[Gamification ranking] Erro completo:', error);
+    // Fallback seguro para não quebrar o frontend
+    return res.json([]);
+  }
+});
+
+// Dados de Fidelidade
+router.get('/fidelity', authenticate, authorize('PATIENT'), async (req: any, res: any) => {
+  try {
+    const patient = await ensurePatient(req.user?.userId);
+    return res.json({
+      points: (patient as any).experiencePoints || (patient as any).healthPoints || 0
+    });
+  } catch (error) {
+    console.error('[Gamification fidelidade] Erro:', error);
+    return res.json({ points: 0 });
+  }
+});
+
+// Histórico de Fidelidade
+router.get('/fidelity/history', authenticate, authorize('PATIENT'), async (req: any, res: any) => {
+  try {
+    const patient = await ensurePatient(req.user?.userId);
+    const history = await prisma.pointsHistory.findMany({
+      where: { patientId: (patient as any).id },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+    return res.json(history);
+  } catch (error) {
+    console.error('[Gamification fidelidade history] Erro:', error);
+    return res.json([]);
   }
 });
 

@@ -1,25 +1,43 @@
 import prisma from '../lib/prisma.js';
 import { ledgerService, AccountType } from './ledger.service.js';
+import { paymentGateway, CreateChargeParams } from './payment-gateway.service.js';
 
 export class PaymentService {
     /**
-     * Gera um micro-depósito Pix para um agendamento
+     * Gera um micro-depósito Pix para um agendamento usando o Gateway configurado (Assas/Mock)
      */
-    async generatePixDeposit(appointmentId: string, amount: number) {
-        // Simulação de integração com Gateway de Pagamento (ex: Stripe, Mercado Pago, Efí)
-        const txId = `PIX_${Math.random().toString(36).substring(7).toUpperCase()}`;
-        const expiresAt = new Date();
-        expiresAt.setMinutes(expiresAt.getMinutes() + 30); // 30 minutos para pagar
+    async generatePixDeposit(appointmentId: string, amount: number, customerData?: {
+        name: string;
+        email: string;
+        taxId?: string;
+        phone?: string;
+    }) {
+        // 1. Criar cobrança via Gateway
+        const chargeParams: CreateChargeParams = {
+            amount,
+            method: 'PIX',
+            description: `Micro-depósito para agendamento ${appointmentId}`,
+            externalReference: `appointment_${appointmentId}`,
+            customer: customerData || {
+                name: 'Paciente Teste',
+                email: 'paciente@teste.com',
+                taxId: '00000000000'
+            },
+            dueDateDays: 1
+        };
 
+        const charge = await paymentGateway.createCharge(chargeParams);
+
+        // 2. Salvar no banco de dados
         const deposit = await prisma.pixDeposit.create({
             data: {
                 appointmentId,
                 amount,
-                status: 'PENDING',
-                txId,
-                pixQrCode: `MOCKED_QR_CODE_FOR_${txId}`,
-                pixCopyPaste: `MOCKED_PIX_COPY_PASTE_${txId}`,
-                expiresAt
+                status: charge.status as any,
+                txId: charge.gatewayId,
+                pixQrCode: charge.pixQrCode,
+                pixCopyPaste: charge.pixCopyPaste,
+                expiresAt: charge.expiresAt
             }
         });
 

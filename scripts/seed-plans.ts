@@ -14,7 +14,9 @@ async function main() {
       price: 0,
       interval: 'MONTHLY' as const,
       features: JSON.stringify(['Consulta de profissionais', 'Solicitação de orçamentos']),
+      featuresArray: ['Consulta de profissionais', 'Solicitação de orçamentos'],
       isActive: true,
+      updatedAt: new Date(),
     },
     {
       key: 'gold',
@@ -23,7 +25,10 @@ async function main() {
       price: 1999,
       interval: 'MONTHLY' as const,
       features: JSON.stringify(['Prontuário Digital Completo', 'Insights de Saúde Avançados', 'Sistema de Gamificação']),
+      featuresArray: ['Prontuário Digital Completo', 'Insights de Saúde Avançados', 'Sistema de Gamificação'],
       isActive: true,
+      isPopular: true,
+      updatedAt: new Date(),
     },
     {
       key: 'premium',
@@ -32,7 +37,9 @@ async function main() {
       price: 29999,
       interval: 'MONTHLY' as const,
       features: JSON.stringify(['Tudo do Plano Gold', 'Até 5 Dependentes', 'Coordenador de Saúde', 'Atendimento prioritário']),
+      featuresArray: ['Tudo do Plano Gold', 'Até 5 Dependentes', 'Coordenador de Saúde', 'Atendimento prioritário'],
       isActive: true,
+      updatedAt: new Date(),
     }
   ];
 

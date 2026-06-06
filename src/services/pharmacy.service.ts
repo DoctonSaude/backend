@@ -73,11 +73,11 @@ export class PharmacyService {
     async getOrCreatePatient(userId: string) {
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            include: { person: { include: { patient: true } } }
+            include: { Person: { include: { Patient: true } } }
         });
 
-        if (user?.person?.patient)
-            return user.person.patient;
+        if (user?.Person?.Patient)
+            return user.Person.Patient;
 
         // Se o usuário não tem perfil de paciente, criamos um no Person vinculado
         if (!user?.personId)
@@ -216,7 +216,7 @@ export class PharmacyService {
         return await (prisma as any).pharmacyOrder.findMany({
             where,
             include: {
-                patient: { include: { person: true } },
+                Patient: { include: { Person: true } },
                 items: { include: { product: true } }
             },
             orderBy: { createdAt: 'desc' }

@@ -200,13 +200,9 @@ router.get('/', authenticate, async (req, res) => {
       const errorCode = serviceErr?.code || 'unknown';
       console.error(`[Notifications Error] Code: ${errorCode}, Message: ${errorStr}`);
 
-      // Em produção, se houver QUALQUER erro de banco (ex: tabela ou coluna "dataJson" faltante), 
-      // retornamos lista vazia estruturada para não quebrar o frontend (Dashboard).
-      if (process.env.NODE_ENV === 'production') {
-        return res.json([]);
-      }
-
-      throw serviceErr;
+      // Em dev/prod, falha de banco não deve derrubar o dashboard — retorna lista vazia.
+      console.warn('[Notifications] Retornando lista vazia por erro de serviço:', errorStr);
+      return res.json([]);
     }
   } catch (error: any) {
     console.error('Erro fatal ao buscar notificações:', error);

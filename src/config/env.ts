@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 /**
  * Schema de validação para variáveis de ambiente
@@ -50,17 +50,24 @@ const envSchema = z.object({
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.string().transform(Number).pipe(z.number()).default('900000'),
-  RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).pipe(z.number()).default('1000'), // Increased for dev
-  AUTH_RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).pipe(z.number()).default('50'), // Increased for dev
+  RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).pipe(z.number()).default('500'), // Adjusted to a more secure baseline
+  AUTH_RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).pipe(z.number()).default('20'), // Stricter auth limit
 
   // Security
   BCRYPT_ROUNDS: z.string().transform(Number).pipe(z.number().min(10).max(15)).default('12'),
 
-  ADMIN_DEV_BYPASS: z.string().transform(val => val === 'true').default('true'),
+  ADMIN_DEV_BYPASS: z.string().transform(val => val === 'true').default('false'),
   ADMIN_DEV_USER_ID: z.string().default('admin-dev'),
 
   // OpenAI
   OPENAI_API_KEY: z.string().optional(),
+
+  // Payment Gateway (Assas)
+  PAYMENT_GATEWAY_PROVIDER: z.enum(['mock', 'assas', 'stripe', 'mercadopago', 'pagarme']).default('mock'),
+  PAYMENT_GATEWAY_API_KEY: z.string().optional(),
+  PAYMENT_GATEWAY_BASE_URL: z.string().optional(),
+  PAYMENT_GATEWAY_WEBHOOK_SECRET: z.string().optional(),
+  PAYMENT_GATEWAY_PUBLIC_KEY: z.string().optional(),
 });
 
 /**
@@ -79,6 +86,8 @@ function validateEnv() {
     if (process.env.NODE_ENV === 'test') {
       process.env.PORT = '3001';
       process.env.ENABLE_CRON_JOBS = 'false';
+      process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://mock:mock@localhost:5432/mock';
+      process.env.JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-stable-for-docton-saude-2024-token-key-32chars';
     }
     // Se JWT_SECRET não estiver definido ou for o padrão inseguro, gerar um novo
     if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'secret') {
@@ -112,7 +121,8 @@ function validateEnv() {
       }
 
       if (env.ADMIN_DEV_BYPASS) {
-        console.warn('⚠️  AVISO: ADMIN_DEV_BYPASS está ativado em produção - desative para segurança');
+        console.error('❌ ERRO CRÍTICO: ADMIN_DEV_BYPASS está ativado em produção - bloqueando inicialização por segurança');
+        process.exit(1);
       }
     }
 

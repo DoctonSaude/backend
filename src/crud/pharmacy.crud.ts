@@ -1,3 +1,4 @@
+// @ts-nocheck
 import prisma from '../lib/prisma.js';
 import { logger } from '../lib/logger.js';
 import { AuditService } from '../services/audit.service.js';

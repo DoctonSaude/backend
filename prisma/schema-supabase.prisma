@@ -26,7 +26,8 @@ model AuthUser {
   
   // Relations to our extended profiles
   patientProfile   Patient?
-  pharmacyProfile  Pharmacy?
+  pharmacyId       String?   // Adicionado para relação com Pharmacy
+  pharmacy         Pharmacy? @relation(fields: [pharmacyId], references: [id])
   adminProfile     Admin?
   
   @@map("auth.users")
@@ -81,42 +82,57 @@ model Patient {
 
 model Pharmacy {
   id              String    @id @default(cuid())
-  userId          String    @unique // Foreign key to auth.users
-  authUser        AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId        String?
+  // Relação compatível com o backend principal
+  users           AuthUser[]
   
   // Basic Information
   name            String
-  cnpj            String    @unique
-  phone           String
-  email           String
+  cnpj            String?    @unique
+  phone           String?
+  email           String?
+  whatsapp        String?
   website         String?
+  reasonSocial    String?
+  logo            String?
+  coverImage      String?
   
-  // Location (critical for ranking and delivery)
-  address         String
-  city            String
-  state           String
-  postalCode      String
-  coordinates     Json      // {lat: -16.6864, lng: -49.2643}
+  // Address (critical for ranking and delivery)
+  address         String?
+  neighborhood    String?
+  city            String?
+  state           String?
+  zipCode         String?
+  postalCode      String?    // Mantido por compatibilidade
+  coordinates     Json?      // {lat: -16.6864, lng: -49.2643}
+  lat             Float?
+  lng             Float?
   
   // Business Information
-  openingHours    Json      // Opening hours by day
-  specialties     String[]  // Pharmacy specialties
-  services        String[]  // Delivery, compounding, etc.
+  openingHours    String?    // Opening hours by day
+  specialties     String[]   @default([])
+  services        String[]   @default([])
+  acceptedPayments String[]  @default(["PIX", "CREDIT_CARD", "CASH"])
   
   // Ranking and Performance
-  rating          Float     @default(0)
-  reviewCount     Int       @default(0)
-  deliveryTime    Int?      // Average delivery time in minutes
-  deliveryFee     Float     @default(0)
+  rating          Float      @default(0)
+  reviewCount     Int        @default(0)
+  deliveryTime    Int?       // Average delivery time in minutes
+  deliveryFee     Float      @default(0)
+  deliveryTimeAvg Int?
+  deliveryMinOrder Float     @default(0)
+  deliveryRadius  Float?
+  hasDelivery     Boolean    @default(false)
   
   // Integration
-  isActive        Boolean   @default(true)
-  verified        Boolean   @default(false)
-  apiKey          String?   @unique // For API integration
+  isActive        Boolean    @default(true)
+  verified        Boolean    @default(false)
+  isApproved      Boolean    @default(false)
+  apiKey          String?    @unique // For API integration
   
   // Timestamps
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
   
   // Relations
   staff           PharmacyStaff[]
@@ -127,8 +143,6 @@ model Pharmacy {
   
   @@index([city])
   @@index([state])
-  @@index([coordinates])
-  @@index([rating])
   @@index([isActive])
   @@map("pharmacies")
 }
@@ -319,6 +333,8 @@ model Inventory {
 model Quote {
   id              String    @id @default(cuid())
   patientId       String    // Can be null for anonymous quotes
+  pharmacyId      String?   // Adicionado para relação
+  pharmacy        Pharmacy? @relation(fields: [pharmacyId], references: [id])
   
   // Quote Request
   medications     Json      // Array of requested medications

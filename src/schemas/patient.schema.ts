@@ -28,20 +28,26 @@ export const AnamnesisSchema = z.object({
     physicalExam: z.string().optional(),
     assessment: z.string().optional(),
     plan: z.string().optional(),
+    doctorName: z.string().optional(),
+    specialty: z.string().optional(),
 });
 
 export const HealthExamSchema = z.object({
     date: z.string().transform(val => new Date(val)),
     type: z.string().min(1, 'Tipo é obrigatório'),
     name: z.string().min(1, 'Nome do exame é obrigatório'),
-    doctor: z.string().optional(),
+    doctor: z.string().min(1, 'Médico é obrigatório'),
     laboratory: z.string().optional(),
     status: z.string().min(1, 'Status é obrigatório'),
     results: z.string().optional(),
+    referenceValues: z.string().optional(),
+    interpretation: z.string().optional(),
     attachments: z.array(z.string()).optional(),
     urgency: z.string().default('Normal'),
     fasting: z.boolean().default(false),
     preparation: z.string().optional(),
+    cost: z.number().optional(),
+    healthPlan: z.string().optional(),
 });
 
 export const PrescriptionSchema = z.object({
@@ -51,6 +57,9 @@ export const PrescriptionSchema = z.object({
     frequency: z.string().min(1, 'Frequência é obrigatória'),
     duration: z.string().optional(),
     instructions: z.string().optional(),
+    doctor: z.string().optional(),
+    sideEffects: z.string().optional().nullable(),
+    contraindications: z.string().optional().nullable(),
     status: z.string().default('Ativo'),
     startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
     endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
@@ -61,8 +70,14 @@ export const MedicationReminderSchema = z.object({
     medicationName: z.string().min(1, 'Nome do medicamento é obrigatório'),
     dosage: z.string().min(1, 'Dosagem é obrigatória'),
     times: z.array(z.string()).min(1, 'Pelo menos um horário é obrigatório'),
-    startDate: z.string().transform(val => new Date(val)),
-    endDate: z.string().optional().nullable().transform(val => val ? new Date(val) : null),
+    startDate: z.union([z.string(), z.date()]).transform(val => val instanceof Date ? val : new Date(val)),
+    endDate: z
+      .union([z.string(), z.date(), z.null()])
+      .optional()
+      .transform(val => {
+        if (!val || val === '') return null;
+        return val instanceof Date ? val : new Date(val as string);
+      }),
     isActive: z.boolean().default(true),
     notes: z.string().optional().nullable(),
     prescriptionId: z.string().optional().nullable(),

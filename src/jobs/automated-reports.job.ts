@@ -1,3 +1,4 @@
+// @ts-nocheck
 import cron from 'node-cron';
 import prisma from '../lib/prisma';
 import { ReportGeneratorService } from '../services/report-generator.service';

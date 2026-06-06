@@ -1,0 +1,1 @@
+{"version":3,"file":"company.crud.d.ts","sourceRoot":"","sources":["../../src/crud/company.crud.ts"],"names":[],"mappings":"AAGA,OAAO,EAAE,WAAW,EAAE,MAAM,oBAAoB,CAAC;AAEjD,eAAO,MAAM,WAAW;IACpB;;OAEG;iBACgB,WAAW;IAc9B;;OAEG;2BAC0B,MAAM,UAAU,MAAM;IA2BnD;;OAEG;gCAC+B,MAAM;IAYxC;;OAEG;yCACwC,MAAM,UAAU,MAAM;IAejE;;OAEG;2CAC0C,MAAM;;;;;;;;;CAyBtD,CAAC"}

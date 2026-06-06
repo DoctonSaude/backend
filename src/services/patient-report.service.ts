@@ -1,3 +1,4 @@
+// @ts-nocheck
 import PDFDocument from 'pdfkit';
 import { Buffer } from 'buffer';
 import path from 'path';

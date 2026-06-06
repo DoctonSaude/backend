@@ -1,4 +1,5 @@
-import winston from 'winston';
+import * as winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 import { env } from '../config/env.js';
 
 const { combine, timestamp, printf, colorize, json } = winston.format;
@@ -7,6 +8,14 @@ const logFormat = printf(({ level, message, timestamp, ...meta }) => {
   const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
   return `${timestamp} [${level}]: ${message}${metaStr}`;
 });
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Ensure the logs directory exists to prevent crash on production
+if (!fs.existsSync('logs')) {
+  fs.mkdirSync('logs', { recursive: true });
+}
 
 export const logger = winston.createLogger({
   level: env.LOG_LEVEL || 'info',
@@ -22,13 +31,21 @@ export const logger = winston.createLogger({
         logFormat
       ),
     }),
-    // Habilitar logs em arquivo em produção se necessário
-    ...(env.NODE_ENV === 'production'
-      ? [
-        new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'logs/combined.log' }),
-      ]
-      : []),
+    new DailyRotateFile({
+      filename: 'logs/error-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      level: 'error',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d'
+    }),
+    new DailyRotateFile({
+      filename: 'logs/combined-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d'
+    }),
   ],
 });
 

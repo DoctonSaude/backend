@@ -23,6 +23,14 @@ export function getPharmacyQuotesQueue(): Queue | null {
     return _queue;
 }
 
-// Deprecated: for backward compatibility during refactor, but it might be null
-// Note: This will be null if REDIS_URL is not configured
-export const pharmacyQuotesQueue = _queue;
+/**
+ * pharmacyQuotesQueue
+ * Exportação reativa para compatibilidade
+ */
+export const pharmacyQuotesQueue = {
+    add: async (name: string, data: any, options: any) => {
+        const queue = getPharmacyQuotesQueue();
+        if (!queue) throw new Error('Redis not configured, cannot add to queue');
+        return queue.add(name, data, options);
+    }
+} as any;

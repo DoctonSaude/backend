@@ -21,16 +21,19 @@ export const createNotification = async (data: CreateInAppNotification) => {
                 message: data.message,
                 priority: data.priority || 'medium',
                 link: data.link || null,
-                data: data.data || {},
-                read: false
+                dataJson: data.data || {},
+                read: false,
+                updatedAt: new Date()
             }
         });
 
         // Enviar via Socket para tempo real
         if (created.userId) {
+            console.log(`[Notification] Enviando para usuário ${created.userId}`);
             SocketService.sendToUser(created.userId, 'new_notification', created);
         } else {
             // Notificações de sistema/admin (userId null) vão para todos os admins
+            console.log('[Notification] Enviando para sala de ADMINS');
             SocketService.sendToAdmins('new_notification', created);
         }
 
@@ -71,7 +74,7 @@ export const markAsRead = async (id: string, userId: string) => {
     try {
         const data = await prisma.notification.update({
             where: { id },
-            data: { read: true }
+            data: { read: true, updatedAt: new Date() }
         });
         return data;
     } catch (error) {

@@ -12,11 +12,38 @@ export class StorageService {
     private static readonly BUCKET_PRESCRIPTIONS = 'prescriptions';
     private static readonly BUCKET_DOCUMENTS = 'patient-documents';
     private static readonly BUCKET_AVATARS = 'avatars';
+    private static readonly BUCKET_MARKETING = 'marketing';
+
+    /**
+     * Garante que um bucket existe, criando-o se necessário
+     */
+    private static async ensureBucket(bucketName: string, isPublic: boolean = true) {
+        try {
+            const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+            if (listError) throw listError;
+
+            const exists = buckets?.some(b => b.name === bucketName);
+
+            if (!exists) {
+                logger.info(`Creating missing bucket: ${bucketName}`);
+                const { error: createError } = await supabase.storage.createBucket(bucketName, { 
+                    public: isPublic,
+                    fileSizeLimit: 10 * 1024 * 1024 // 10MB default
+                });
+                if (createError && !createError.message.includes('already exists')) {
+                    throw createError;
+                }
+            }
+        } catch (err: any) {
+            logger.warn(`Potential issue ensuring bucket ${bucketName}: ${err.message}. Proceeding anyway...`);
+        }
+    }
 
     /**
      * Upload de Avatar (usado em patient.routes.ts)
      */
     async uploadAvatar(fileBody: Buffer, fileName: string, contentType: string) {
+        await StorageService.ensureBucket(StorageService.BUCKET_AVATARS);
         const path = `avatars/${Date.now()}_${fileName}`;
         const result = await StorageService.uploadToBucket(StorageService.BUCKET_AVATARS, path, fileBody, contentType);
         return result.url;
@@ -25,9 +52,12 @@ export class StorageService {
     /**
      * Upload Genérico (usado em patient.routes.ts)
      */
-    async uploadFile(fileBody: Buffer, fileName: string, contentType: string, folder: string = 'others') {
+    async uploadFile(fileBody: Buffer, fileName: string, contentType: string, folder: string = 'others', specificBucket?: string) {
+        const targetBucket = specificBucket || StorageService.BUCKET_DOCUMENTS;
+        await StorageService.ensureBucket(targetBucket);
+        
         const path = `${folder}/${Date.now()}_${fileName}`;
-        const result = await StorageService.uploadToBucket(StorageService.BUCKET_DOCUMENTS, path, fileBody, contentType);
+        const result = await StorageService.uploadToBucket(targetBucket, path, fileBody, contentType);
         return result.url;
     }
 

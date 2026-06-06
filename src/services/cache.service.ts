@@ -51,16 +51,18 @@ export class CacheService {
         return localValue
       }
 
-      // Try Redis
-      const redisValue = await this.redis.get(key)
-      if (redisValue !== null) {
-        const parsed = JSON.parse(redisValue)
+      // Try Redis only if available
+      if (this.redis) {
+        const redisValue = await this.redis.get(key)
+        if (redisValue !== null) {
+          const parsed = JSON.parse(redisValue)
 
-        // Store in local cache for faster access
-        this.setToLocal(key, parsed, 300) // 5 minutes local cache
+          // Store in local cache for faster access
+          this.setToLocal(key, parsed, 300) // 5 minutes local cache
 
-        this.stats.hits++
-        return parsed
+          this.stats.hits++
+          return parsed
+        }
       }
 
       this.stats.misses++
@@ -82,24 +84,20 @@ export class CacheService {
       // Prepare value
       let serializedValue = JSON.stringify(value)
 
-      // Compress if enabled and value is large
-      if (compress && serializedValue.length > 1024) {
-        // In production, you'd use zlib compression
-        serializedValue = serializedValue
-      }
-
-      // Set in Redis
-      if (ttl > 0) {
-        await this.redis.setex(key, ttl, serializedValue)
-      } else {
-        await this.redis.set(key, serializedValue)
+      // Set in Redis only if available
+      if (this.redis) {
+        if (ttl > 0) {
+          await this.redis.setex(key, ttl, serializedValue)
+        } else {
+          await this.redis.set(key, serializedValue)
+        }
       }
 
       // Set in local cache
       this.setToLocal(key, value, Math.min(ttl, 300)) // Max 5 minutes local
 
       // Add to tags for invalidation
-      if (tags.length > 0) {
+      if (tags.length > 0 && this.redis) {
         await this.addToTags(key, tags)
       }
 
@@ -114,7 +112,7 @@ export class CacheService {
    */
   async delete(key: string): Promise<void> {
     try {
-      await this.redis.del(key)
+      if (this.redis) await this.redis.del(key)
       this.localCache.delete(key)
       this.stats.deletes++
     } catch (error) {
@@ -127,6 +125,13 @@ export class CacheService {
    */
   async deleteByTags(tags: string[]): Promise<void> {
     try {
+      if (!this.redis) {
+        // Fallback local simples para tags se Redis não estiver presente
+        // (Nota: em multi-instância isso não limpará outros nós, mas evita erros)
+        this.localCache.clear();
+        return;
+      }
+
       for (const tag of tags) {
         const keys = await this.redis.smembers(`tag:${tag}`)
         if (keys.length > 0) {
@@ -182,11 +187,14 @@ export class CacheService {
    */
   async increment(key: string, amount: number = 1, ttl?: number): Promise<number> {
     try {
-      const result = await this.redis.incrby(key, amount)
-      if (ttl) {
-        await this.redis.expire(key, ttl)
+      if (this.redis) {
+        const result = await this.redis.incrby(key, amount)
+        if (ttl) {
+          await this.redis.expire(key, ttl)
+        }
+        return result
       }
-      return result
+      return 0
     } catch (error) {
       console.error('Cache increment error:', error)
       return 0

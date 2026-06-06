@@ -7,6 +7,12 @@ import { UserCrud } from '../crud/user.crud';
 import { logger } from '../lib/logger';
 import prisma from '../lib/prisma';
 
+// Segurança: impedir que o bypass de admin de desenvolvimento esteja ativo em produção.
+if (env.NODE_ENV === 'production' && env.ADMIN_DEV_BYPASS) {
+  logger.error('CRITICAL: ADMIN_DEV_BYPASS habilitado em produção — abortando inicialização por segurança');
+  throw new Error('Security violation: ADMIN_DEV_BYPASS habilitado em produção');
+}
+
 interface JwtPayload {
   userId: string;
   role: string;
@@ -87,6 +93,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     try {
+      if (!tokenUserId) {
+        logger.error('[auth] tokenUserId is undefined', { decoded });
+        throw new AuthenticationError('ID de usuário não encontrado no token');
+      }
+
       // Busca blindada apenas com campos existentes
       const user = await prisma.user.findUnique({
         where: { id: tokenUserId },
@@ -98,7 +109,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           tenantId: true
         }
       });
-
       if (!user) {
         logger.error(`[auth] Usuário ${tokenUserId} não encontrado no banco de dados.`, {
           role: decoded.role,
@@ -122,14 +132,15 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       if (lookupErr instanceof AuthenticationError) throw lookupErr;
 
       const msg = lookupErr?.message ? String(lookupErr.message) : String(lookupErr);
-      const code = lookupErr?.code;
-
-      logger.error('[auth] Erro crítico no lookup de usuário:', { error: msg, code });
+      logger.error('[auth] Erro crítico no lookup de usuário:', { 
+        error: msg, 
+        stack: lookupErr?.stack,
+        tokenUserId 
+      });
       
-      return res.status(503).json({ 
-        error: 'Serviço de banco de dados temporariamente indisponível',
-        message: 'Não foi possível validar sua sessão com o banco de dados.',
-        code
+      return res.status(500).json({ 
+        error: 'Erro interno ao validar autenticação',
+        details: env.NODE_ENV === 'development' ? msg : undefined
       });
     }
   } catch (error: any) {

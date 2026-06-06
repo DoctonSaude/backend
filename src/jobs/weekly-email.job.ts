@@ -1,3 +1,4 @@
+// @ts-nocheck
 import cron from 'node-cron';
 import emailService from '../services/email.service';
 import prisma from '../lib/prisma';

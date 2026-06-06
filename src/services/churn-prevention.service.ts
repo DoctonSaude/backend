@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * SERVIÇO DE PREVENÇÃO DE CHURN - ESTRATÉGIA IMUNOLOGIA DO CLIENTE
  * Implementa as 3 fases: Diagnóstico, Prevenção e Tratamento

@@ -61,6 +61,15 @@ export class OCRMaintenanceJob {
     async cleanupOldImages() {
         try {
             const uploadsDir = PEDOMED_CONFIG.OCR.STORAGE.LOCAL_PATH;
+            
+            // Garantir que o diretório existe para evitar erro ENOENT
+            try {
+                await fs.access(uploadsDir);
+            } catch (e) {
+                console.log(`[OCRMaintenanceJob] Creating missing directory: ${uploadsDir}`);
+                await fs.mkdir(uploadsDir, { recursive: true });
+            }
+
             const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 dias
             const cutoffTime = Date.now() - maxAge;
             console.log('[OCRMaintenanceJob] Cleaning up old images...');
@@ -193,6 +202,14 @@ export class OCRMaintenanceJob {
     async estimateStorageUsage() {
         try {
             const uploadsDir = PEDOMED_CONFIG.OCR.STORAGE.LOCAL_PATH;
+            
+            // Verificar se o diretório existe
+            try {
+                await fs.access(uploadsDir);
+            } catch (e) {
+                return 0; // Se não existe, uso é zero
+            }
+
             const files = await fs.readdir(uploadsDir);
             let totalSize = 0;
             for (const file of files) {

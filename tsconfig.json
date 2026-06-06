@@ -3,7 +3,12 @@
         "target": "ES2022",
         "module": "CommonJS",
         "moduleResolution": "Node",
+        "baseUrl": ".",
+        "paths": {
+            "*": ["node_modules/*", "src/*"]
+        },
         "outDir": "./dist",
+        "isolatedModules": true,
         // "rootDir": "./src", i
         "strict": true,
         "noEmitOnError": false,

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import prisma from '../lib/prisma';

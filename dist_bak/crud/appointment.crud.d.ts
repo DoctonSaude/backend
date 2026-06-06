@@ -1,0 +1,83 @@
+export declare const AppointmentCrud: {
+    create(data: any): Promise<{
+        status: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        patientId: string;
+        notes: string | null;
+        duration: number | null;
+        partnerId: string | null;
+        isOnline: boolean;
+        dateTime: Date | null;
+        meetingLink: string | null;
+        roomId: string | null;
+        equipmentId: string | null;
+        professionalId: string | null;
+    }>;
+    findById(id: string): Promise<{
+        status: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        patientId: string;
+        notes: string | null;
+        duration: number | null;
+        partnerId: string | null;
+        isOnline: boolean;
+        dateTime: Date | null;
+        meetingLink: string | null;
+        roomId: string | null;
+        equipmentId: string | null;
+        professionalId: string | null;
+    }>;
+    update(id: string, data: any): Promise<{
+        status: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        patientId: string;
+        notes: string | null;
+        duration: number | null;
+        partnerId: string | null;
+        isOnline: boolean;
+        dateTime: Date | null;
+        meetingLink: string | null;
+        roomId: string | null;
+        equipmentId: string | null;
+        professionalId: string | null;
+    }>;
+    delete(id: string): Promise<{
+        status: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        patientId: string;
+        notes: string | null;
+        duration: number | null;
+        partnerId: string | null;
+        isOnline: boolean;
+        dateTime: Date | null;
+        meetingLink: string | null;
+        roomId: string | null;
+        equipmentId: string | null;
+        professionalId: string | null;
+    }>;
+    list(): Promise<{
+        status: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        patientId: string;
+        notes: string | null;
+        duration: number | null;
+        partnerId: string | null;
+        isOnline: boolean;
+        dateTime: Date | null;
+        meetingLink: string | null;
+        roomId: string | null;
+        equipmentId: string | null;
+        professionalId: string | null;
+    }[]>;
+};
+//# sourceMappingURL=appointment.crud.d.ts.map

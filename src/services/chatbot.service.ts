@@ -2,10 +2,19 @@ import prisma from '../lib/prisma';
 import OpenAI from 'openai';
 import { env } from '../config/env';
 
-const openai = env.OPENAI_API_KEY ? new OpenAI({ apiKey: env.OPENAI_API_KEY }) : null;
-
+let openaiInstance: OpenAI | null = null;
+function getOpenAI(): OpenAI | null {
+  if (openaiInstance) return openaiInstance;
+  const key = env.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  if (key) {
+    openaiInstance = new OpenAI({ apiKey: key });
+    return openaiInstance;
+  }
+  return null;
+}
 export class ChatbotService {
   static async processQuery(query: string) {
+    const openai = getOpenAI();
     // Se não houver chave OpenAI, usa fallback para lógica de intenção simples
     if (!openai) {
       return this.processQuerySimple(query);
@@ -191,6 +200,7 @@ Seja objetivo e analítico.
   }
 
   static async processPartnerQuery(query: string, userId: string) {
+    const openai = getOpenAI();
     if (!openai) {
       return this.processPartnerQuerySimple(query, userId);
     }
@@ -297,39 +307,245 @@ Seja proativo em sugerir melhorias baseadas nos números.
     }
   }
 
-  private static async processPartnerQuerySimple(query: string, userId: string) {
-    const lowerQuery = query.toLowerCase();
+  static async processPatientQuery(query: string, userId: string) {
+    const openai = getOpenAI();
+    if (!openai) {
+      const fallback = await this.processPatientQuerySimple(query, userId);
+      fallback.content += "\n\n[System Debug] Modo Fallback Ativo: A chave OPENAI_API_KEY não foi encontrada pela aplicação no startup.";
+      return fallback;
+    }
 
-    // Fallback simples para parceiros
-    if (lowerQuery.includes('agenda') || lowerQuery.includes('consulta')) {
-      const response = {
-        content: "📅 **Insight de Agenda**\n\nSua agenda parece estável. Recomendo verificar os agendamentos de amanhã para confirmar comparecimento.\n\n• **Ação:** [Ver Agenda](/partner/agenda)",
-        charts: [{ type: 'metric', data: { label: 'Ocupação', value: '75%', change: '+5%', positive: true } }]
-      };
+    try {
+      const patient = await prisma.patient.findUnique({
+        where: { userId },
+        include: {
+          HealthLog: { orderBy: { logDate: 'desc' }, take: 10 },
+          Prescription: { where: { status: 'Ativo' } as any, take: 5 },
+          Appointment: {
+            where: { dateTime: { gte: new Date() }, status: { not: 'Cancelado' } },
+            orderBy: { dateTime: 'asc' },
+            take: 3
+          },
+          QuotationRequest: { where: { status: 'OPEN' }, take: 3 }
+        }
+      });
 
+      if (!patient) return { content: "Perfil de paciente não encontrado." };
+
+      const patientName = patient.userId ? (await prisma.user.findUnique({ where: { id: userId } }))?.name : "Paciente";
+      const gender = patient.avatarPreference === 'MALE' ? 'Masculino' : 'Feminino';
+      const assistantName = patient.avatarPreference === 'MALE' ? 'Luan' : 'Luma';
+
+      const systemPrompt = `
+Você é ${assistantName}, a assistente virtual inteligente da Luma Saúde (Docton Saúde). 
+Sua missão é ser uma companheira de saúde atenciosa, empática e proativa.
+
+PERSONALIDADE:
+- Calorosa, inspiradora e técnica quando necessário.
+- Use o nome do paciente: ${patientName}.
+- Você fala como um orientador de saúde, NÃO como um médico que dá diagnóstico definitivo.
+- Se o paciente relatar sintomas graves, SEMPRE oriente buscar atendimento de urgência.
+
+CONTEXTO DO PACIENTE (${patientName}):
+- Sexo do Avatar: ${gender}
+- Metas de Saúde: ${patient.healthGoals.join(', ') || 'Não definidas'}
+- Registros Recentes: ${patient.HealthLog.map(l => `${l.type}: ${l.value}`).join(', ') || 'Nenhum'}
+- Prescrições Ativas: ${patient.Prescription.map(p => p.medication).join(', ') || 'Nenhuma'}
+- Próximas Consultas: ${patient.Appointment.length} agendadas.
+- Cotações de Exame Abertas: ${patient.QuotationRequest.length} pendentes.
+
+REGRAS:
+1. Identifique se o paciente precisa de uma cotação de exame ou medicamento. Se sim, sugira criar uma cotação.
+2. Ajude a interpretar os dados de saúde dele de forma motivadora.
+3. Se o paciente perguntar sobre algo que exige ação (ex: "quero marcar uma consulta"), forneça o link.
+4. Responda em Português do Brasil.
+5. Formato de resposta: Markdown amigável.
+6. BLOCO JSON (OBRIGATÓRIO para ações ou intenções detecadas):
+   ---JSON_BLOCK---
+   {
+     "intent": {
+        "type": "APPOINTMENT" | "QUOTE" | "EXAM" | "INFO",
+        "description": "Breve descrição da intenção do paciente",
+        "metadata": { "specialty": "Cardiologia", "medication": "Aspirina", "urgency": "high" }
+     },
+     "actions": [
+        { "label": "Solicitar Cotação", "action": "quote", "data": "exame_sugerido" },
+        { "label": "Ver Meus Medicamentos", "action": "navigate", "data": "/patient/medications" }
+     ],
+     "voice": true
+   }
+   ---END_JSON_BLOCK---
+
+URLs Úteis:
+- /patient/triage (Triagem de sintomas)
+- /patient/explore (Buscar médicos)
+- /patient/health-insights (Métricas e metas)
+- /patient/medications (Meus remédios)
+- /patient/orders (Meus pedidos/cotações)
+
+Seja sempre empática.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: query }
+        ],
+        temperature: 0.8,
+      });
+
+      const content = response.choices[0]?.message?.content || "";
+      let finalContent = content;
+      let charts: any[] | undefined;
+      let actions: any[] | undefined;
+      let shouldVoice = false;
+
+      const jsonMatch = content.match(/---JSON_BLOCK---([\s\S]*?)---END_JSON_BLOCK---/);
+      if (jsonMatch) {
+        try {
+          const jsonData = JSON.parse(jsonMatch[1].trim());
+          charts = jsonData.charts;
+          actions = jsonData.actions;
+          shouldVoice = jsonData.voice || false;
+          finalContent = content.replace(/---JSON_BLOCK---[\s\S]*?---END_JSON_BLOCK---/, "").trim();
+
+          // Salvar intenção estruturada se detectada
+          if (jsonData.intent) {
+            const meta = jsonData.intent.metadata || {};
+            await prisma.healthIntent.create({
+              data: {
+                patientId: patient.id,
+                intent: jsonData.intent.type,
+                status: 'OPEN',
+                context: {
+                  description: jsonData.intent.description,
+                  item:
+                    meta.medication ||
+                    meta.item ||
+                    jsonData.intent.description,
+                  metadata: meta,
+                  query,
+                } as any,
+              },
+            });
+          }
+        } catch (e) {
+          console.error("Erro ao parsear JSON da IA:", e);
+        }
+      }
+
+      // Salvar no histórico
       await prisma.chatHistory.create({
         data: {
           userId,
           message: query,
-          response: response.content,
-          context: { charts: response.charts } as any
+          response: finalContent,
+          context: { charts, actions, isPatient: true } as any
         }
       });
 
-      return response;
+      return { content: finalContent, charts, actions, voice: true }; // Sempre voz para Luma se solicitado no MVP
+
+    } catch (error: any) {
+      console.error("Erro na OpenAI (Patient):", error);
+      const fallback = await this.processPatientQuerySimple(query, userId);
+      fallback.content += "\n\n[System Debug] Erro da OpenAI detectado: " + (error.message || String(error));
+      return fallback;
+    }
+  }
+  
+  private static async processPartnerQuerySimple(query: string, userId: string) {
+    const q = query.toLowerCase();
+    const partner = await prisma.partner.findUnique({ where: { userId } });
+    
+    let content = `Olá${partner?.name ? `, ${partner.name}` : ''}! Identifiquei que você é um parceiro Docton. No momento estou operando em modo simplificado, mas posso te ajudar com informações básicas.`;
+    const actions: any[] = [];
+    
+    if (q.includes("agenda") || q.includes("agendamento") || q.includes("consulta")) {
+      content = "Você pode gerenciar todos os seus agendamentos diretamente na sua agenda digital.";
+      actions.push({ label: "Ver Minha Agenda", action: "navigate", data: "/partner/agenda" });
+    } else if (q.includes("serviço") || q.includes("procedimento")) {
+      content = "Seus serviços e tabela de preços podem ser editados na seção de Meus Serviços.";
+      actions.push({ label: "Gerenciar Serviços", action: "navigate", data: "/partner/meus-servicos" });
+    } else if (q.includes("financeiro") || q.includes("pagamento") || q.includes("repasse")) {
+      content = "Para verificar seus repasses e histórico financeiro, acesse o dashboard financeiro.";
+      actions.push({ label: "Extrato Financeiro", action: "navigate", data: "/partner/financeiro" });
+    } else if (q.includes("paciente") || q.includes("usuário")) {
+      content = "A gestão dos seus pacientes e histórico de atendimentos está disponível no CRM.";
+      actions.push({ label: "CRM de Pacientes", action: "navigate", data: "/partner/crm-pacientes" });
     }
 
-    const content = `🤖 Sou seu assistente Docton. Entendi seu interesse em "${query}".\n\nNo momento estou operando em um modo simplificado, mas posso te ajudar a navegar pela **agenda**, **serviços** ou **financeiro**.`;
+    return { content, actions };
+  }
 
-    await prisma.chatHistory.create({
-      data: {
-        userId,
-        message: query,
-        response: content,
-        context: {}
+  private static async processPatientQuerySimple(query: string, userId: string) {
+    const q = query.toLowerCase();
+    let content = "Olá! Eu sou a Luma. No momento estou operando em modo de economia de energia (sem chave de IA), mas posso anotar o que você precisa.";
+    let intent: any = null;
+    let actions: any[] = [];
+
+    if (q.includes("dor") || q.includes("sinto") || q.includes("sentindo")) {
+      content = "Sinto muito que você não esteja se sentindo bem. Como sua assistente, recomendo que agende uma triagem ou procure um médico parceiro para uma avaliação detalhada.";
+      actions.push({ label: "Marcar Triagem", action: "navigate", data: "/patient/triagem" });
+      intent = { type: "INFO", description: "Paciente relatando mal-estar" };
+    } else if (q.includes("exame") || q.includes("laboratório")) {
+      content = "Entendido. Você gostaria de solicitar uma cotação para algum exame específico? Posso te ajudar a encontrar os melhores preços nos laboratórios parceiros.";
+      actions.push({ label: "Solicitar Cotação", action: "navigate", data: "/patient/orders" });
+      intent = { type: "EXAM", description: "Interesse em exames" };
+    } else if (q.includes("remédio") || q.includes("medicamento") || q.includes("receita") || q.includes("comprar")) {
+       content = "Posso te ajudar a encontrar medicamentos com desconto. Você tem uma receita digital ou gostaria de buscar por um nome específico?";
+       actions.push({ label: "Buscar Medicamentos", action: "navigate", data: "/patient/explore" });
+       intent = { type: "QUOTE", description: "Interesse em medicamentos" };
+    } else if (q.includes("consulta") || q.includes("médico") || q.includes("especialista")) {
+       content = "Com certeza! Temos diversos especialistas prontos para te atender. Qual especialidade você está procurando?";
+       actions.push({ label: "Explorar Médicos", action: "navigate", data: "/patient/explore" });
+       intent = { type: "APPOINTMENT", description: "Busca por consulta" };
+    }
+
+    // Tentar persistir a intenção mesmo no modo simples (se o banco permitir)
+    try {
+      if (intent) {
+        const patient = await prisma.patient.findUnique({ where: { userId } });
+        if (patient) {
+          await prisma.healthIntent.create({
+            data: {
+              patientId: patient.id,
+              intent: intent.type,
+              status: 'OPEN',
+              context: {
+                description: intent.description,
+                item: intent.description,
+                query: q,
+              } as any,
+            },
+          });
+        }
       }
-    });
+    } catch (e) {
+      console.warn("Banco de dados indisponível para salvar intenção simples.");
+    }
 
-    return { content };
+    return { content, actions, voice: false };
+  }
+
+  static async generateSpeech(text: string) {
+    const openai = getOpenAI();
+    if (!openai) return null;
+
+    try {
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: "nova",
+        input: text,
+      });
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      return buffer;
+    } catch (error: any) {
+      console.error("Erro CRÍTICO ao gerar voz na OpenAI:", error.message || error);
+      console.error(error); // Imprime stack e detalhes de rate limit / auth
+      return null;
+    }
   }
 }

@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 export class RevenueService {
     /**
@@ -26,11 +25,12 @@ export class RevenueService {
             // Insight de Ocupação Baixa
             if (occupancyRate < 30) {
                 insights.push({
-                    type: 'INFO',
+                    type: 'RETENTION',
                     title: 'Ocupação Atual',
-                    message: `Sua ocupação atual é de ${occupancyRate.toFixed(1)}%.`,
+                    message: `Sua ocupação está em ${occupancyRate.toFixed(1)}%. Abra mais horários na agenda para aumentar seus atendimentos.`,
                     action: 'Ver Agenda',
-                    impact: 'Otimização'
+                    impact: 'OTIMIZAÇÃO',
+                    route: '/partner/agenda'
                 });
             }
 

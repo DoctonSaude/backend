@@ -125,6 +125,14 @@ export class RateLimiterService {
     const windowStart = Math.floor(now / config.windowMs) * config.windowMs
 
     try {
+      if (!this.redis) {
+        return {
+          used: 0,
+          remaining: config.max,
+          resetTime: windowStart + config.windowMs,
+          total: config.max
+        }
+      }
       // Remove old entries and count current
       const pipeline = this.redis.pipeline()
       pipeline.zremrangebyscore(key, 0, windowStart - 1)
@@ -160,7 +168,7 @@ export class RateLimiterService {
     }
 
     const key = config.keyGenerator!(req)
-    await this.redis.del(key)
+    if (this.redis) await this.redis.del(key)
   }
 
   /**
@@ -241,6 +249,14 @@ export class RateLimiterService {
     const windowStart = now - windowMs
 
     try {
+      if (!this.redis) {
+        return {
+          allowed: true,
+          remaining: maxRequests,
+          resetTime: now + windowMs,
+          total: maxRequests
+        }
+      }
       const pipeline = this.redis.pipeline()
 
       // Remove entries outside the sliding window
@@ -293,6 +309,7 @@ export class RateLimiterService {
     const now = Date.now()
 
     try {
+      if (!this.redis) return { allowed: true, remaining: capacity, resetTime: now + 1000, total: capacity }
       const script = `
         local key = KEYS[1]
         local now = tonumber(ARGV[1])
