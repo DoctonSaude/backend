@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { redis } from '../lib/redis'
+
+// Redis is optional - if not available, cache middleware will be disabled
+let redis: any = null
+
+try {
+  // Try to import Redis, but don't fail if it's not available
+  const redisModule = require('../lib/redis')
+  redis = redisModule.redis || redisModule.default
+} catch (error) {
+  console.warn('⚠️  Redis not available - cache middleware disabled')
+}
 
 // Configurações de cache
 interface CacheConfig {
@@ -46,21 +56,23 @@ export async function cacheMiddleware(
     // Gerar chave de cache
     const cacheKey = generateCacheKey(request, finalConfig)
     
-    // Tentar obter do cache
-    const cachedResponse = await redis.get(cacheKey)
-    if (cachedResponse) {
-      console.log(`🎯 Cache HIT for ${pathname}`)
-      
-      const response = new NextResponse(JSON.stringify(cachedResponse.body), {
-        status: cachedResponse.status,
-        headers: cachedResponse.headers
-      })
-      
-      // Adicionar header indicando cache
-      response.headers.set('X-Cache', 'HIT')
-      response.headers.set('X-Cache-Key', cacheKey)
-      
-      return response
+    // Tentar obter do cache (only if redis is available)
+    if (redis) {
+      const cachedResponse = await redis.get(cacheKey)
+      if (cachedResponse) {
+        console.log(`🎯 Cache HIT for ${pathname}`)
+        
+        const response = new NextResponse(JSON.stringify(cachedResponse.body), {
+          status: cachedResponse.status,
+          headers: cachedResponse.headers
+        })
+        
+        // Adicionar header indicando cache
+        response.headers.set('X-Cache', 'HIT')
+        response.headers.set('X-Cache-Key', cacheKey)
+        
+        return response
+      }
     }
     
     console.log(`❌ Cache MISS for ${pathname}`)
@@ -100,9 +112,11 @@ export async function saveResponseToCache(
       headers: Object.fromEntries(response.headers.entries())
     }
     
-    // Salvar no cache
-    await redis.set(cacheKey, cacheData, finalConfig.ttl)
-    console.log(`💾 Cached response for ${pathname} (${finalConfig.ttl}s)`)
+    // Salvar no cache (only if redis is available)
+    if (redis) {
+      await redis.set(cacheKey, cacheData, finalConfig.ttl)
+      console.log(`💾 Cached response for ${pathname} (${finalConfig.ttl}s)`)
+    }
     
   } catch (error) {
     console.error('Save to cache error:', error)
@@ -139,8 +153,10 @@ function generateCacheKey(request: NextRequest, config: CacheConfig): string {
 // Invalidar cache por padrão
 export async function invalidateCache(pattern: string): Promise<void> {
   try {
-    await redis.clearPattern(`api:${pattern}*`)
-    console.log(`🗑️ Invalidated cache pattern: ${pattern}`)
+    if (redis) {
+      await redis.clearPattern(`api:${pattern}*`)
+      console.log(`🗑️ Invalidated cache pattern: ${pattern}`)
+    }
   } catch (error) {
     console.error('Cache invalidation error:', error)
   }
@@ -149,10 +165,12 @@ export async function invalidateCache(pattern: string): Promise<void> {
 // Invalidar cache por tags
 export async function invalidateCacheByTags(tags: string[]): Promise<void> {
   try {
-    for (const tag of tags) {
-      await redis.clearPattern(`*:${tag}:*`)
+    if (redis) {
+      for (const tag of tags) {
+        await redis.clearPattern(`*:${tag}:*`)
+      }
+      console.log(`🏷️ Invalidated cache by tags: ${tags.join(', ')}`)
     }
-    console.log(`🏷️ Invalidated cache by tags: ${tags.join(', ')}`)
   } catch (error) {
     console.error('Cache tag invalidation error:', error)
   }

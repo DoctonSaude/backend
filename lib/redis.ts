@@ -2,45 +2,77 @@ import Redis from 'ioredis'
 
 // Configuração Redis para cache e sessões
 class RedisClient {
-  private client: Redis
+  private client: Redis | null = null
+  private enabled: boolean = false
 
   constructor() {
-    this.client = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
-      // Configurações de cache
-      keyPrefix: process.env.REDIS_PREFIX || 'docton:',
-      // TTL padrão (1 hora)
-      defaultTTL: parseInt(process.env.REDIS_TTL || '3600')
-    })
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
+    
+    // Only create client if Redis URL is configured and not empty
+    if (!redisUrl || redisUrl.trim() === '' || redisUrl === 'redis://localhost:6379') {
+      console.log('ℹ️  Redis not configured - running without cache')
+      this.enabled = false
+      return
+    }
 
-    // Event listeners
-    this.client.on('connect', () => {
-      console.log('✅ Redis connected successfully')
-    })
+    try {
+      this.client = new Redis(redisUrl, {
+        retryDelayOnFailover: 100,
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+        retryStrategy: (times) => {
+          if (times > 3) {
+            console.warn('⚠️  Redis connection failed after 3 retries - operating without Redis')
+            return null; // Stop retrying
+          }
+          return Math.min(times * 100, 3000)
+        },
+        // Configurações de cache
+        keyPrefix: process.env.REDIS_PREFIX || 'docton:',
+        // TTL padrão (1 hora)
+        defaultTTL: parseInt(process.env.REDIS_TTL || '3600')
+      })
 
-    this.client.on('error', (err) => {
-      console.error('❌ Redis connection error:', err)
-    })
+      this.enabled = true
 
-    this.client.on('close', () => {
-      console.log('🔌 Redis connection closed')
-    })
+      // Event listeners
+      this.client.on('connect', () => {
+        console.log('✅ Redis connected successfully')
+      })
+
+      this.client.on('error', (err) => {
+        console.error('❌ Redis connection error:', err)
+      })
+
+      this.client.on('close', () => {
+        console.log('🔌 Redis connection closed')
+      })
+    } catch (error) {
+      console.error('Failed to initialize Redis client:', error)
+      this.enabled = false
+      this.client = null
+    }
   }
 
   // Conectar ao Redis
   async connect(): Promise<void> {
+    if (!this.enabled || !this.client) {
+      console.log('ℹ️  Redis not enabled - skipping connection')
+      return
+    }
     try {
       await this.client.connect()
     } catch (error) {
       console.error('Failed to connect to Redis:', error)
-      throw error
+      // Don't throw - allow app to continue without Redis
     }
   }
 
   // Cache simples
   async set(key: string, value: any, ttl?: number): Promise<void> {
+    if (!this.enabled || !this.client) {
+      return // Silently skip if Redis not available
+    }
     try {
       const serializedValue = JSON.stringify(value)
       const expireTime = ttl || parseInt(process.env.REDIS_TTL || '3600')
@@ -57,6 +89,9 @@ class RedisClient {
 
   // Obter cache
   async get<T>(key: string): Promise<T | null> {
+    if (!this.enabled || !this.client) {
+      return null // Return null if Redis not available
+    }
     try {
       const value = await this.client.get(key)
       if (value === null) return null
@@ -70,6 +105,9 @@ class RedisClient {
 
   // Deletar cache
   async del(key: string): Promise<void> {
+    if (!this.enabled || !this.client) {
+      return
+    }
     try {
       await this.client.del(key)
     } catch (error) {
@@ -79,6 +117,9 @@ class RedisClient {
 
   // Limpar cache por padrão
   async clearPattern(pattern: string): Promise<void> {
+    if (!this.enabled || !this.client) {
+      return
+    }
     try {
       const keys = await this.client.keys(pattern)
       if (keys.length > 0) {
@@ -140,11 +181,16 @@ class RedisClient {
 
   // Desconectar
   async disconnect(): Promise<void> {
-    await this.client.quit()
+    if (this.client) {
+      await this.client.quit()
+    }
   }
 
   // Verificar saúde do Redis
   async healthCheck(): Promise<boolean> {
+    if (!this.enabled || !this.client) {
+      return false
+    }
     try {
       const result = await this.client.ping()
       return result === 'PONG'

@@ -82,13 +82,12 @@ router.use('/partners', partnerPublicRoutes);
 router.use('/partners', partnerLegacyRoutes); // Fallback legado
 
 // 2. Admin & Management (Centralizado)
-router.use('/admin', adminRoutes);
-
 router.use('/admin/plans', plansRoutes);
 router.use('/admin/prices', pricesRoutes);
 router.use('/admin/financial', financialRoutes); // Conectando rotas financeiras avançadas
 router.use('/admin/transfers', transfersRoutes); // Conectando rotas de repasse
 router.use('/admin/service-categories', categoriesRoutes);
+router.use('/admin', adminRoutes);
 router.use('/admin', adminLegacyRoutes); // Fallback legado para o que restou
 
 // 3. Features & Modules

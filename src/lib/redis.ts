@@ -7,28 +7,46 @@ let bullmqClient: Redis | null = null;
 
 function createClient(url: string | undefined, options: any = {}): Redis | null {
     if (!url || url.trim() === '') {
+        console.log('ℹ️  Redis URL not configured - Redis disabled');
         return null;
     }
-    const c = new Redis(url, {
-        lazyConnect: true,
-        maxRetriesPerRequest: 3,
-        connectTimeout: 5000, // 5 seconds timeout
-        ...options
-    });
+    
+    try {
+        const c = new Redis(url, {
+            lazyConnect: true,
+            maxRetriesPerRequest: 3,
+            connectTimeout: 5000, // 5 seconds timeout
+            retryStrategy: (times) => {
+                if (times > 3) {
+                    console.warn('⚠️  Redis connection failed after 3 retries - operating without Redis');
+                    return null; // Stop retrying
+                }
+                return Math.min(times * 100, 3000);
+            },
+            ...options
+        });
 
-    c.on('error', (err) => {
-        // Just log, don't crash
-        if (env.NODE_ENV === 'development') {
-            // Keep it quiet in dev logs if it's just a connection failure
-            if ((err as any).code !== 'ECONNREFUSED') {
-                console.error('Redis Error:', err.message);
+        c.on('error', (err) => {
+            // Just log, don't crash
+            if (env.NODE_ENV === 'development') {
+                // Keep it quiet in dev logs if it's just a connection failure
+                if ((err as any).code !== 'ECONNREFUSED') {
+                    console.error('Redis Error:', err.message);
+                }
+            } else {
+                console.error('Redis Error:', err);
             }
-        } else {
-            console.error('Redis Error:', err);
-        }
-    });
+        });
 
-    return c;
+        c.on('connect', () => {
+            console.log('✅ Redis connected successfully');
+        });
+
+        return c;
+    } catch (error) {
+        console.error('Failed to create Redis client:', error);
+        return null;
+    }
 }
 
 export function getRedisClient(): Redis | null {
