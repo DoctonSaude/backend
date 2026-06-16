@@ -16,7 +16,7 @@ export function dbErrorHandlerMiddleware(err: any, req: Request, res: Response, 
 
   // Detectar erros de banco/Prisma
   const isDbError =
-    msg.toLowerCase().includes('tenant or user not found') ||
+    msg.toLowerCase().includes('economicGroup or user not found') ||
     msg.toLowerCase().includes('error querying the database') ||
     msg.toLowerCase().includes('can\'t reach database server') ||
     msg.toLowerCase().includes('connection') ||

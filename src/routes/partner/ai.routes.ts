@@ -194,12 +194,31 @@ router.post('/ai/optimize-schedule', authenticate, authorize('PARTNER'), async (
       { id: 2, type: 'open_slot', time: '16:00', reason: 'Horário de maior demanda para sua especialidade' }
     ];
 
+    const analysis = `Analisamos ${appointments.length} agendamentos. Sugerimos agrupar horários para reduzir janelas ociosas.`;
+
+    // CREATE: Saving the optimization insight into Supabase to make it a full CRUD flow
+    await prisma.aiInsight.create({
+      data: {
+        title: 'Otimização de Agenda',
+        description: analysis,
+        type: 'OPPORTUNITY',
+        impact: 'ALTO',
+        category: 'LOGISTICA',
+        confidence: 95,
+        actionable: true,
+        priority: 1,
+        userId: userId,
+        data: suggestions as any
+      }
+    });
+
     return res.json({ 
       success: true, 
-      analysis: `Analisamos ${appointments.length} agendamentos. Sugerimos agrupar horários para reduzir janelas ociosas.`,
+      analysis,
       suggestions 
     });
   } catch (error) {
+    console.error('[Optimize Schedule Error]', error);
     return res.status(500).json({ error: 'Erro ao otimizar agenda' });
   }
 });

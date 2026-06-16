@@ -9,11 +9,13 @@ import inAppNotificationService from '../services/inAppNotification.service.js';
 import { PatientReportService } from '../services/patient-report.service.js';
 import { LoyaltyService } from '../services/loyalty.service.js';
 import { storageService } from '../services/storage.service.js';
+import lumaProactiveService from '../services/ai/lumaProactive.service.js';
 import multer from 'multer';
 import { MedicalHistorySchema, AnamnesisSchema, HealthExamSchema, PrescriptionSchema, MedicationReminderSchema, SubscriptionSchema, ChangePlanSchema } from '../schemas/patient.schema.js';
 import { aiInsightService } from '../services/aiInsight.service.js';
 import { patientService } from '../services/patient.service.js';
 import { AIRecommendationService } from '../services/aiRecommendation.service.js'; // NOVO: Motor de IA Preditiva
+import { healthJourneyService } from '../services/health-journey.service.js';
 import { wearablesPilotService, getLevelInfo, updateStreak } from '../services/gamification.service.js';
 import {
   computeNextDueFromTimes,
@@ -32,6 +34,7 @@ import {
   markAllPrescriptionAlertsRead,
 } from '../services/prescription-alert.service.js';
 import { getMedicationAdherenceReport } from '../services/medication-adherence.service.js';
+import { calculateDistanceKm } from '../utils/geo.js';
 import {
   persistPaymentCharge,
   getPaymentChargeForPatient,
@@ -85,48 +88,7 @@ const syncSubscriptionWithSupabase = async (subscription: any, operation: 'creat
     }
 };
 
-// Helper para garantir que o registro de Patient exista para o usuário
-const ensurePatient = async (userId: string, personId?: string) => {
-  // 1. Tentar encontrar por userId (mais confiável para novos registros)
-  let patient = await prisma.patient.findUnique({
-    where: { userId }
-  });
 
-  if (patient) return patient;
-
-  // 2. Se não achou por userId, tentar por personId se disponível
-  if (personId) {
-    patient = await prisma.patient.findUnique({
-      where: { personId }
-    });
-    if (patient) return patient;
-  }
-
-  // 3. Criar registro padrão se não existir (Resiliência)
-  console.log(`[ensurePatient] Criando registro de paciente faltante para userId: ${userId}`);
-
-  // Garantir que temos um personId se estiver faltando (opcional mas recomendado no schema)
-  let targetPersonId = personId;
-  if (!targetPersonId) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { personId: true }
-    });
-    targetPersonId = user?.personId || undefined;
-  }
-
-  patient = await prisma.patient.create({
-    data: {
-      userId,
-      personId: targetPersonId,
-      archetype: 'GENERAL',
-      healthPoints: 0,
-      experiencePoints: 0
-    }
-  });
-
-  return patient;
-};
 
 const validate = (schema: z.ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -188,7 +150,7 @@ router.post('/support/tickets', authenticate, authorize('PATIENT'), async (req, 
         category: category || 'General',
         priority: priority || 'MEDIUM',
         status: 'OPEN',
-        patientId: patient.id,
+        patient: { connect: { id: patient.id } },
         messages: {
           create: {
             message,
@@ -301,11 +263,10 @@ router.get('/evaluations/pending', authenticate, authorize('PATIENT'), async (re
         status: 'COMPLETED',
         // Check if there's no review for this appointment
         NOT: {
-          Review: { is: { not: null } }
+          review: { isNot: null }
         }
       },
-      include: {
-        Partner: { 
+      include: { Partner: { 
           include: {
             User: { select: { name: true, avatar: true } }
           }
@@ -319,9 +280,9 @@ router.get('/evaluations/pending', authenticate, authorize('PATIENT'), async (re
       id: apt.id,
       partner: {
         id: apt.partnerId,
-        name: (apt as any).Partner?.User?.name || 'Profissional',
-        avatar: (apt as any).Partner?.User?.avatar,
-        specialty: (apt as any).Partner?.specialty
+        name: (apt as any).partner?.User?.name || 'Profissional',
+        avatar: (apt as any).partner?.User?.avatar,
+        specialty: (apt as any).partner?.specialty
       },
       date: apt.dateTime.toISOString(),
       isCompleted: true,
@@ -344,9 +305,8 @@ router.get('/evaluations/history', authenticate, authorize('PATIENT'), async (re
     const history = await prisma.review.findMany({
       where: { patientId: patient.id },
       include: {
-        Appointment: {
-          include: {
-            Partner: {
+        appointment: {
+          include: { Partner: {
               include: {
                 User: { select: { name: true, avatar: true } }
               }
@@ -362,11 +322,11 @@ router.get('/evaluations/history', authenticate, authorize('PATIENT'), async (re
       id: rvw.appointmentId,
       partner: {
         id: rvw.partnerId,
-        name: (rvw as any).Appointment?.Partner?.User?.name || 'Profissional',
-        avatar: (rvw as any).Appointment?.Partner?.User?.avatar,
-        specialty: (rvw as any).Appointment?.Partner?.specialty
+        name: (rvw as any).appointment?.partner?.User?.name || 'Profissional',
+        avatar: (rvw as any).appointment?.partner?.User?.avatar,
+        specialty: (rvw as any).appointment?.partner?.specialty
       },
-      date: (rvw as any).Appointment?.dateTime?.toISOString() || rvw.createdAt.toISOString(),
+      date: (rvw as any).appointment?.dateTime?.toISOString() || rvw.createdAt.toISOString(),
       isCompleted: true,
       isEvaluated: true
     }));
@@ -398,7 +358,7 @@ router.post('/evaluations/:appointmentId', authenticate, authorize('PATIENT'), a
       update: {
         rating: parseInt(rating, 10),
         comment: comment || '',
-        wouldRecommend: wouldRecommend ?? true,
+        
         updatedAt: new Date()
       },
       create: {
@@ -407,7 +367,7 @@ router.post('/evaluations/:appointmentId', authenticate, authorize('PATIENT'), a
         partnerId: appointment.partnerId,
         rating: parseInt(rating, 10),
         comment: comment || '',
-        wouldRecommend: wouldRecommend ?? true,
+        
         updatedAt: new Date()
       }
     });
@@ -455,7 +415,7 @@ router.get('/dashboard', authenticate, authorize('PATIENT'), async (req, res) =>
 
       const dbUnavailable =
         process.env.NODE_ENV === 'production' &&
-        (msg.toLowerCase().includes('tenant or user not found') ||
+        (msg.toLowerCase().includes('economicGroup or user not found') ||
           msg.toLowerCase().includes('error querying the database') ||
           code === 'P1001');
 
@@ -504,7 +464,7 @@ router.post('/appointments', authenticate, authorize('PATIENT'), async (req, res
     const personId = req.user?.personId;
     const { partnerId, dateTime, notes } = req.body;
 
-    const patient = await ensurePatient(userId, personId);
+    const patient = await patientService.ensurePatient(userId);
 
     // Validar se o parceiro existe e está aprovado
     const partner = await prisma.partner.findUnique({
@@ -523,14 +483,13 @@ router.post('/appointments', authenticate, authorize('PATIENT'), async (req, res
     // Criar agendamento
     const appointment = await prisma.appointment.create({
       data: {
-        patientId: patient.id,
-        partnerId: partnerId,
+        Patient: { connect: { id: patient.id } },
+        Partner: { connect: { id: partner.id } },
         dateTime: new Date(dateTime),
         notes: notes || '',
         status: 'SCHEDULED'
       },
-      include: {
-        Partner: {
+      include: { Partner: {
           select: { id: true, name: true, specialty: true }
         }
       }
@@ -549,12 +508,11 @@ router.get('/appointments', authenticate, authorize('PATIENT'), async (req, res)
     const userId = req.user!.userId;
     const personId = req.user?.personId;
 
-    const patient = await ensurePatient(userId, personId);
+    const patient = await patientService.ensurePatient(userId);
 
     const appointments = await prisma.appointment.findMany({
       where: { patientId: patient.id },
-      include: {
-        Partner: {
+      include: { Partner: {
           include: {
             User: { select: { name: true, avatar: true } }
           }
@@ -818,7 +776,7 @@ router.get('/health-logs', authenticate, authorize('PATIENT'), async (req, res) 
 // Criar um novo log de saúde (Humor, BPM, etc)
 router.post('/health-logs', authenticate, authorize('PATIENT'), async (req, res) => {
   try {
-    const { type, value, unit, notes, logDate, interpretation, category, recommendations, inputs } = req.body;
+    const { type, value, unit, notes, logDate,  } = req.body;
     const patient = await prisma.patient.findUnique({ where: { userId: req.user?.userId } });
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
 
@@ -830,12 +788,17 @@ router.post('/health-logs', authenticate, authorize('PATIENT'), async (req, res)
         unit,
         notes,
         logDate: logDate ? new Date(logDate) : new Date(),
-        interpretation,
-        category,
-        recommendations,
-        inputs
+        
       }
     });
+
+    // Gatilho da IA Luma Proativa (Assíncrono para não travar a requisição)
+    lumaProactiveService.evaluateHealthMetric(
+      req.user!.userId,
+      type,
+      String(value),
+      unit || ''
+    ).catch(err => console.error('Erro na Luma Proativa:', err));
 
     // GATILHO DE DESAFIO (Conectividade Gamification)
     let actionType = type;
@@ -898,7 +861,7 @@ router.post('/health-logs', authenticate, authorize('PATIENT'), async (req, res)
 router.put('/health-logs/:id', authenticate, authorize('PATIENT'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { value, notes, logDate, interpretation, category, recommendations, inputs, type, unit } = req.body;
+    const { value, notes, logDate, type, unit } = req.body;
     const patient = await prisma.patient.findUnique({ where: { userId: req.user?.userId } });
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
 
@@ -914,10 +877,6 @@ router.put('/health-logs/:id', authenticate, authorize('PATIENT'), async (req, r
         value: value ? String(value) : undefined,
         notes,
         logDate: logDate ? new Date(logDate) : undefined,
-        interpretation,
-        category,
-        recommendations,
-        inputs,
         type,
         unit
       }
@@ -1078,7 +1037,7 @@ router.post('/daily-tasks', authenticate, authorize('PATIENT'), async (req, res)
 
     const newTask = await prisma.patientDailyTask.create({
       data: {
-        patientId: patient.id,
+        patient: { connect: { id: patient.id } },
         task,
         xp: xp || 50,
         icon: icon || '✅',
@@ -1115,7 +1074,7 @@ router.get('/profile', authenticate, authorize('PATIENT'), async (req, res) => {
     const userId = req.user!.userId;
     const personId = req.user?.personId;
 
-    const patient = await ensurePatient(userId, personId);
+    const patient = await patientService.ensurePatient(userId);
 
     const profile = await prisma.patient.findUnique({
       where: { id: patient.id },
@@ -1128,8 +1087,8 @@ router.get('/profile', authenticate, authorize('PATIENT'), async (req, res) => {
             phone: true
           }
         },
-        Subscription: {
-          include: { Plan: true },
+        subscriptions: {
+          include: { plan: true },
           where: { status: 'ACTIVE' },
           take: 1
         }
@@ -1139,7 +1098,7 @@ router.get('/profile', authenticate, authorize('PATIENT'), async (req, res) => {
 
     // Mapeia o plano para o frontend (Prioridade: planType > Subscription)
     const patientPlan = (profile as any).planType;
-    const subscriptionPlan = (profile as any).Subscription?.[0]?.Plan?.key;
+    const subscriptionPlan = (profile as any).subscriptions?.[0]?.Plan?.key;
     let finalPlan = 'basic';
 
     if (patientPlan && patientPlan !== 'Gratuito' && patientPlan !== 'Básico') {
@@ -1173,7 +1132,7 @@ router.get('/profile', authenticate, authorize('PATIENT'), async (req, res) => {
       planType: (profile as any).planType,
       plan: finalPlan,
       user,
-      subscriptions: (profile as any).Subscription,
+      subscriptions: (profile as any).subscriptions,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt
     };
@@ -1192,20 +1151,20 @@ router.get('/subscription', authenticate, authorize('PATIENT'), async (req, res)
     const patient = await prisma.patient.findUnique({
       where: { userId },
       include: {
-        Subscription: {
+        subscriptions: {
           where: { status: 'ACTIVE' },
-          include: { Plan: true },
+          include: { plan: true },
           orderBy: { startedAt: 'desc' },
           take: 1
         }
       }
     });
 
-    if (!patient || !patient.Subscription.length) {
+    if (!patient || !patient.subscriptions.length) {
       return res.status(404).json({ error: 'Nenhuma assinatura ativa encontrada' });
     }
 
-    res.json(patient.Subscription[0]);
+    res.json(patient.subscriptions[0]);
   } catch (error) {
     console.error('Erro ao buscar assinatura:', error);
     res.status(500).json({ error: 'Erro ao buscar assinatura' });
@@ -1220,20 +1179,20 @@ router.post('/subscription', authenticate, authorize('PATIENT'), validate(Subscr
 
     const patient = await prisma.patient.findUnique({
       where: { userId },
-      include: { Subscription: { where: { status: 'ACTIVE' } } }
+      include: { subscriptions: { where: { status: 'ACTIVE' } } }
     });
 
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
 
     // Cancelar assinaturas ativas anteriores se existirem
-    if (patient.Subscription.length > 0) {
+    if (patient.subscriptions.length > 0) {
       await prisma.subscription.updateMany({
         where: { patientId: patient.id, status: 'ACTIVE' },
         data: { status: 'CANCELLED', cancelledAt: new Date(), updatedAt: new Date() }
       });
       
       // Sync cancelled subscriptions
-      for (const sub of patient.Subscription) {
+      for (const sub of patient.subscriptions) {
           await syncSubscriptionWithSupabase(sub, 'update');
       }
     }
@@ -1247,7 +1206,7 @@ router.post('/subscription', authenticate, authorize('PATIENT'), validate(Subscr
         startedAt: new Date(),
         updatedAt: new Date()
       },
-      include: { Plan: true }
+      include: { plan: true }
     });
 
     // 🎁 Gamificação: Bonificação por nova assinatura
@@ -1276,7 +1235,7 @@ router.put('/subscription/change', authenticate, authorize('PATIENT'), validate(
 
     const patient = await prisma.patient.findUnique({
       where: { userId },
-      include: { Subscription: { where: { status: 'ACTIVE' } } }
+      include: { subscriptions: { where: { status: 'ACTIVE' } } }
     });
 
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
@@ -1288,7 +1247,7 @@ router.put('/subscription/change', authenticate, authorize('PATIENT'), validate(
     });
     
     // Sync cancelled subscription
-    for (const sub of patient.Subscription) {
+    for (const sub of patient.subscriptions) {
         await syncSubscriptionWithSupabase(sub, 'update');
     }
 
@@ -1301,7 +1260,7 @@ router.put('/subscription/change', authenticate, authorize('PATIENT'), validate(
         startedAt: new Date(),
         updatedAt: new Date()
       },
-      include: { Plan: true }
+      include: { plan: true }
     });
 
     // 🎁 Gamificação: Bonificação por upgrade/mudança de assinatura
@@ -1659,6 +1618,13 @@ router.post('/onboarding', authenticate, authorize('PATIENT'), async (req, res, 
       console.error('[ONBOARDING] IA Warning: falha ao inicializar perfil preditivo:', aiErr.message);
     }
 
+    // [NOVO] Integração com Jornada de Saúde: Processar Fase 0 -> Fase 1
+    try {
+      await healthJourneyService.processPatientInteractions(patient.id);
+    } catch (journeyErr: any) {
+      console.error('[ONBOARDING] IA Warning: falha ao processar jornada de saúde:', journeyErr.message);
+    }
+
     // Notificar conclusão de onboarding (atualiza perfil e logs)
     await patientService.invalidateDashboardCache(req.user!.userId);
     SocketService.sendToUser(req.user!.userId, 'patientProfileUpdate', updatedPatient);
@@ -1743,20 +1709,19 @@ router.get('/medical-records', authenticate, authorize('PATIENT'), async (req, r
 
     const records = await prisma.medicalRecord.findMany({
       where: { patientId: patient.id },
-      include: {
-        Partner: {
+      include: { partner: {
           include: { User: { select: { name: true } } },
         },
-        Appointment: true,
+        appointment: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
     res.json(
-      records.map((r) => ({
+      records.map((r: any) => ({
         ...r,
-        partner: r.Partner ? { ...r.Partner, user: r.Partner.User } : null,
-        appointment: r.Appointment,
+        partner: r.partner ? { ...r.partner, user: r.partner.User } : null,
+        appointment: r.appointment,
       }))
     );
   } catch (error) {
@@ -1774,11 +1739,10 @@ router.get('/medical-records/:id', authenticate, authorize('PATIENT'), async (re
 
     const record = await prisma.medicalRecord.findFirst({
       where: { id, patientId: patient.id },
-      include: {
-        Partner: {
+      include: { partner: {
           include: { User: { select: { name: true } } },
         },
-        Appointment: true,
+        appointment: true,
       },
     });
 
@@ -1786,8 +1750,8 @@ router.get('/medical-records/:id', authenticate, authorize('PATIENT'), async (re
 
     res.json({
       ...record,
-      partner: record.Partner ? { ...record.Partner, user: record.Partner.User } : null,
-      appointment: record.Appointment,
+      partner: record.partner ? { ...record.partner, user: (record.partner as any).User } : null,
+      appointment: record.appointment,
     });
   } catch (error) {
     console.error('Erro ao buscar detalhes do prontuário:', error);
@@ -3150,8 +3114,8 @@ router.post('/checkout', authenticate, authorize('PATIENT'), async (req, res, ne
             time: appointmentData?.time,
             partnerName:
               appointmentData?.partnerName ||
-              createdAppointment.Partner?.User?.name ||
-              createdAppointment.Partner?.name,
+              createdAppointment.partner?.User?.name ||
+              createdAppointment.partner?.name,
           },
         ]
       : [];
@@ -3216,7 +3180,7 @@ router.get('/pharmacy/orders', authenticate, authorize('PATIENT'), async (req, r
     const orders = await prisma.pharmacyOrder.findMany({
       where: { patientId: patient.id },
       include: {
-        Pharmacy: {
+        pharmacy: {
           select: { id: true, name: true, logo: true, address: true, phone: true },
         },
         PharmacyOrderItem: {
@@ -3237,7 +3201,7 @@ router.get('/pharmacy/orders', authenticate, authorize('PATIENT'), async (req, r
 
     res.json(
       orders.map((order) => {
-        const itemsFromDb = order.PharmacyOrderItem.map((item) => ({
+        const itemsFromDb = (order as any).PharmacyOrderItem?.map((item: any) => ({
           id: item.id,
           name: item.PharmacyProduct?.name || 'Medicamento',
           quantity: item.quantity,
@@ -3273,13 +3237,13 @@ router.get('/pharmacy/orders', authenticate, authorize('PATIENT'), async (req, r
           paymentMethod: order.paymentMethod,
           createdAt: order.createdAt,
           deliverySummary: itemsText,
-          pharmacy: order.Pharmacy
+          Pharmacy: (order as any).pharmacy
             ? {
-                id: order.Pharmacy.id,
-                name: order.Pharmacy.name,
-                logo: order.Pharmacy.logo,
-                address: order.Pharmacy.address,
-                phone: order.Pharmacy.phone,
+                id: (order as any).pharmacy.id,
+                name: (order as any).pharmacy.name,
+                logo: (order as any).pharmacy.logo,
+                address: (order as any).pharmacy.address,
+                phone: (order as any).pharmacy.phone,
               }
             : null,
           items: resolvedItems,
@@ -3305,8 +3269,11 @@ router.post('/pharmacy/quotations', authenticate, authorize('PATIENT'), upload.s
 
     let imageUrl = null;
     if (req.file) {
-      // Simulação de upload (em prod usaria o storageService)
-      imageUrl = `https://storage.docton.com.br/prescriptions/${Date.now()}-${req.file.originalname}`;
+      imageUrl = await storageService.uploadFile(
+        req.file.buffer,
+        req.file.originalname,
+        'prescriptions'
+      );
     }
 
     const quotation = await prisma.quotationRequest.create({
@@ -3395,9 +3362,9 @@ router.get('/pharmacy/quotations', authenticate, authorize('PATIENT'), async (re
       where: { patientId: patient.id },
       include: {
         QuotationRequestItem: true,
-        responses: {
+        QuotationResponse: {
           include: {
-            pharmacy: {
+            Pharmacy: {
               select: {
                 id: true,
                 name: true,
@@ -3416,8 +3383,8 @@ router.get('/pharmacy/quotations', authenticate, authorize('PATIENT'), async (re
 
     res.json(
       quotations.map((q) => {
-        const responseCount = q.responses?.length || 0;
-        const hasAccepted = (q.responses || []).some((r: any) => r.status === 'ACCEPTED');
+        const responseCount = q.QuotationResponse.length || 0;
+        const hasAccepted = (q.QuotationResponse || []).some((r: any) => r.status === 'ACCEPTED');
         const wasPaidViaCheckout = paidQuoteIds.has(q.id);
         let displayStatus = q.status;
         if (q.status === 'CLOSED' || hasAccepted || wasPaidViaCheckout) displayStatus = 'CLOSED';
@@ -3450,15 +3417,15 @@ router.get('/pharmacy/quotations', authenticate, authorize('PATIENT'), async (re
           quantity: item.quantity,
         })),
         displayStatus,
-        responses: (q.responses || []).map((r: any) => ({
+        QuotationResponse: (q.QuotationResponse || []).map((r: any) => ({
           ...r,
-          pharmacy: r.pharmacy
+          Pharmacy: r.Pharmacy
             ? {
-                name: r.pharmacy.name,
-                address: r.pharmacy.address,
-                phone: r.pharmacy.phone,
-                logo: r.pharmacy.logo,
-                User: r.pharmacy.User,
+                name: r.Pharmacy.name,
+                address: r.Pharmacy.address,
+                phone: r.Pharmacy.phone,
+                logo: r.Pharmacy.logo,
+                User: r.Pharmacy.User,
               }
             : null,
         })),
@@ -3483,10 +3450,10 @@ router.post('/pharmacy/quotations/:id/accept', authenticate, authorize('PATIENT'
     // Buscar a resposta e a solicitação
     const response = await prisma.quotationResponse.findUnique({
       where: { id },
-      include: { quotation: true }
+      include: { QuotationRequest: true }
     });
 
-    if (!response || response.quotation.patientId !== patient.id) {
+    if (!response || response.QuotationRequest?.patientId !== patient.id) {
       return res.status(404).json({ error: 'Oferta não encontrada' });
     }
 
@@ -3512,7 +3479,7 @@ router.post('/pharmacy/quotations/:id/accept', authenticate, authorize('PATIENT'
         userId: pharmacyUser.id,
         type: 'SYSTEM',
         title: 'Nova Venda Concluída! 💰',
-        message: `O paciente ${patient.userId} pagou o pedido de ${response.quotation.medicamentName}. Prepare o envio!`,
+        message: `O paciente ${patient.userId} pagou o pedido de ${response.QuotationRequest?.medicamentName}. Prepare o envio!`,
         priority: 'high',
         link: '/pharmacy/dashboard'
       });
@@ -3540,7 +3507,7 @@ function mapPharmacyPromotionForPatient(p: any) {
     isBoosted: p.isBoosted,
     isActive: p.isActive,
     createdAt: p.createdAt,
-    pharmacy: ph
+    Pharmacy: ph
       ? {
           id: ph.id,
           name: ph.name,
@@ -3717,14 +3684,14 @@ router.get('/gamification', authenticate, authorize('PATIENT'), async (req, res)
     const personId = req.user?.personId;
     console.log('[GAMIFICATION] Step 2: userId =', userId);
     
-    const patient = await ensurePatient(userId, personId);
+    const patient = await patientService.ensurePatient(userId);
     console.log('[GAMIFICATION] Step 3: patient =', patient);
 
     // Obter ou criar desafios para o paciente
     console.log('[GAMIFICATION] Step 4: Querying patient challenges...');
     let patientChallenges = await prisma.patientChallenge.findMany({
       where: { patientId: patient.id },
-      include: { Challenge: true },
+      include: { challenge: true },
       orderBy: [{ createdAt: 'desc' }]
     });
     console.log('[GAMIFICATION] Step 5: Found patientChallenges count:', patientChallenges.length);
@@ -3797,7 +3764,7 @@ router.get('/gamification', authenticate, authorize('PATIENT'), async (req, res)
       console.log('[GAMIFICATION] Step 7: Re-querying patient challenges...');
       patientChallenges = await prisma.patientChallenge.findMany({
         where: { patientId: patient.id },
-        include: { Challenge: true },
+        include: { challenge: true },
         orderBy: [{ createdAt: 'desc' }]
       });
       console.log('[GAMIFICATION] Step 8: New patientChallenges count:', patientChallenges.length);
@@ -3806,13 +3773,13 @@ router.get('/gamification', authenticate, authorize('PATIENT'), async (req, res)
     console.log('[GAMIFICATION] Step 9: Mapping missions...');
     const missions = patientChallenges.map(pc => ({
       id: pc.challengeId,
-      title: pc.Challenge?.title,
-      desc: pc.Challenge?.description,
-      points: pc.Challenge?.points,
+      title: pc.challenge?.title,
+      desc: pc.challenge?.description,
+      points: pc.challenge?.points,
       done: pc.status === 'COMPLETED',
-      icon: pc.Challenge?.icon || 'CheckCircle2',
+      icon: pc.challenge?.icon || 'CheckCircle2',
       progress: pc.progress,
-      target: pc.Challenge?.targetValue
+      target: pc.challenge?.targetValue
     }));
     console.log('[GAMIFICATION] Step 10: Missions mapped:', missions);
 
@@ -3852,7 +3819,7 @@ router.post('/gamification/checkin', authenticate, authorize('PATIENT'), async (
     const personId = req.user?.personId;
     const { mood } = req.body;
     
-    const patient = await ensurePatient(userId, personId);
+    const patient = await patientService.ensurePatient(userId);
 
     const updatedPatient = await updateStreak(patient.id);
 
@@ -3886,8 +3853,8 @@ router.post('/gamification/checkin', authenticate, authorize('PATIENT'), async (
 
     // Marcar o desafio de check-in como concluído
     const checkinChallenge = await prisma.patientChallenge.findFirst({
-      where: { patientId: patient.id, Challenge: { type: 'checkin' } },
-      include: { Challenge: true }
+      where: { patientId: patient.id, challenge: { type: 'checkin' } },
+      include: { challenge: true }
     });
 
     if (checkinChallenge && checkinChallenge.status !== 'COMPLETED') {

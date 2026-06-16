@@ -144,7 +144,7 @@ export const errorHandler = (err: Error | AppError, req: Request, res: Response,
 
   // DETECÇÃO DE ERROS DE BANCO - SOLUÇÃO DEFINITIVA
   const isDbError =
-    msg.toLowerCase().includes('tenant or user not found') ||
+    msg.toLowerCase().includes('economicGroup or user not found') ||
     msg.toLowerCase().includes('error querying the database') ||
     msg.toLowerCase().includes('can\'t reach database server') ||
     msg.toLowerCase().includes('connection') ||

@@ -60,7 +60,7 @@ async function dispatchWave(payload: any) {
         lat: quote.lat,
         lng: quote.lng,
         radiusKm,
-        tenantId: null,
+        economicGroupId: null,
         excludeIds: alreadyRecipientIds,
         take,
     });

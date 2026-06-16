@@ -168,14 +168,24 @@ router.post('/webhook', async (req: any, res: any) => {
         const { event, payment } = req.body;
         console.log('[QuotePayments Routes] Webhook received:', { event, paymentId: payment?.id });
         // Verificar se é um evento de pagamento confirmado
-        if (event === 'PAYMENT_CONFIRMED' && payment?.externalReference?.startsWith('quote_payment_')) {
-            const quoteId = payment.externalReference.replace('quote_payment_', '');
-            // Encontrar pagamento pelo quoteId
-            const quotePayment = await (prisma as any).quotePayment.findUnique({
-                where: { quoteId }
+        const externalReference = String(payment?.externalReference || '');
+        let quoteId: string | null = null;
+
+        if (event === 'PAYMENT_CONFIRMED') {
+            if (externalReference.startsWith('quote_payment_')) {
+                quoteId = externalReference.replace('quote_payment_', '');
+            } else if (externalReference.startsWith('quotation_')) {
+                quoteId = externalReference.replace('quotation_', '');
+            }
+        }
+
+        if (quoteId) {
+            // Encontrar pagamento pelo quoteId na tabela QuotationPayment
+            const quotePayment = await prisma.quotationPayment.findUnique({
+                where: { quotationId: quoteId }
             });
             if (quotePayment) {
-                await (quotePaymentService as any).confirmPayment(quotePayment.id);
+                await quotePaymentService.confirmPayment(quotePayment.id);
                 console.log(`[QuotePayments Routes] Payment confirmed for quote ${quoteId}`);
             }
         }

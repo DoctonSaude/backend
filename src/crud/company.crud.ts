@@ -5,7 +5,7 @@ import { CompanyData } from '../types/common.js';
 
 export const CompanyCrud = {
     /**
-     * Cria uma nova empresa vinculada a um tenant
+     * Cria uma nova empresa vinculada a um economicGroup
      */
     async create(data: CompanyData) {
         try {

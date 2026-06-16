@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { engagementService } from './engagement.service.js';
+import { LoyaltyService } from './loyalty.service.js';
 
 export class HealthJourneyService {
     /**
@@ -46,12 +47,15 @@ export class HealthJourneyService {
      * Retorna sugestões dinâmicas baseadas na jornada ativa e localização
      */
     async getJourneySuggestions(patientId: string, location?: { city?: string }) {
-        const journey = await this.getActiveJourney(patientId);
-        if (!journey)
-            return null;
+        const patient = await prisma.patient.findUnique({
+            where: { id: patientId },
+            select: { journeyPhase: true, nextAction: true, abandonmentRisk: true, healthScore: true }
+        });
 
-        if (journey.type === 'ACUTE') {
-            // Se a jornada sugere parceiros, vamos buscar os mais próximos ou da mesma cidade
+        const journey = await this.getActiveJourney(patientId);
+        
+        let activeJourneySuggestions = null;
+        if (journey && journey.type === 'ACUTE') {
             let partnerInfo = 'Parceiros recomendados';
             if (location?.city) {
                 const localPartners = await prisma.partner.count({
@@ -62,7 +66,7 @@ export class HealthJourneyService {
                 }
             }
 
-            return {
+            activeJourneySuggestions = {
                 title: `Acompanhamento: ${journey.triggerTerm}`,
                 suggestions: [
                     { label: 'Farmácias próximas', icon: 'Pill', action: 'pharmacy_search', metadata: { city: location?.city } },
@@ -71,7 +75,109 @@ export class HealthJourneyService {
                 ]
             };
         }
-        return null;
+
+        return {
+            globalState: patient,
+            activeAcuteJourney: activeJourneySuggestions
+        };
+    }
+
+    /**
+     * Atualiza o estado global da jornada do paciente (Fases 0 a 7)
+     */
+    async updateGlobalJourneyState(patientId: string, updates: { phase?: number; score?: number; action?: string; risk?: string; engagement?: number }) {
+        return prisma.patient.update({
+            where: { id: patientId },
+            data: {
+                ...(updates.phase !== undefined && { journeyPhase: updates.phase }),
+                ...(updates.score !== undefined && { healthScore: updates.score }),
+                ...(updates.action !== undefined && { nextAction: updates.action }),
+                ...(updates.risk !== undefined && { abandonmentRisk: updates.risk }),
+                ...(updates.engagement !== undefined && { engagementScore: updates.engagement })
+            }
+        });
+    }
+
+    /**
+     * Recalcula a fase da jornada e score de saúde do paciente com base nas interações
+     */
+    async processPatientInteractions(patientId: string) {
+        const patient = await prisma.patient.findUnique({
+            where: { id: patientId },
+            include: {
+                Appointment: true,
+                medicalRecords: true,
+                healthExams: true,
+                MedicationLog: true
+            }
+        });
+
+        if (!patient) return;
+
+        let newPhase = patient.journeyPhase;
+        let nextAction = patient.nextAction;
+        let score = patient.healthScore;
+
+        // Fase 0: Descoberta -> Fase 1: Conscientização (Após Cadastro / Onboarding)
+        if (newPhase === 0 && patient.onboardingCompleted) {
+            newPhase = 1;
+            nextAction = 'Completar Avaliação de Saúde';
+            score += 10;
+        }
+
+        // Fase 1: Conscientização -> Fase 2: Consulta de Avaliação (Após agendar primeira consulta)
+        if (newPhase === 1 && patient.Appointment.length > 0) {
+            newPhase = 2;
+            nextAction = 'Realizar Consulta Médica';
+            score += 15;
+        }
+
+        // Fase 2: Consulta -> Fase 3: Exames Complementares (Após receber prontuário/receita/exames)
+        if (newPhase === 2 && patient.medicalRecords.length > 0) {
+            newPhase = 3;
+            nextAction = 'Enviar Resultados de Exames';
+            score += 15;
+        }
+
+        // Fase 3: Exames -> Fase 4: Tratamento / Adesão (Após enviar exames ou registrar remédios)
+        if (newPhase === 3 && (patient.healthExams.length > 0 || patient.MedicationLog.length > 0)) {
+            newPhase = 4;
+            nextAction = 'Registrar Uso de Medicamentos';
+            score += 20;
+        }
+
+        // Fase 4 -> Fase 5: Hábitos (Após boa adesão)
+        // Simplificado para o MVP
+        if (newPhase === 4 && patient.currentStreak > 3) {
+            newPhase = 5;
+            nextAction = 'Completar Desafios Diários';
+            score += 20;
+        }
+
+        const finalScore = Math.min(100, score);
+        
+        await this.updateGlobalJourneyState(patientId, {
+            phase: newPhase,
+            score: finalScore,
+            action: nextAction || 'Continue engajado',
+            engagement: Math.min(100, patient.engagementScore + 5)
+        });
+
+        // Integração com Gamificação (Docton Coins)
+        if (newPhase > patient.journeyPhase || finalScore > patient.healthScore) {
+            const pointsGained = (newPhase > patient.journeyPhase) ? 100 : 50;
+            const desc = (newPhase > patient.journeyPhase) ? `Subiu para a Fase ${newPhase} na Jornada` : 'Melhoria no score de saúde';
+            
+            try {
+                await LoyaltyService.awardPoints(patientId, pointsGained, 'HEALTH_JOURNEY_PROGRESS', desc, {
+                    oldPhase: patient.journeyPhase,
+                    newPhase: newPhase
+                });
+                console.log(`[GAMIFICATION] ${pointsGained} Docton Coins awarded to ${patientId}`);
+            } catch (err) {
+                console.error('[GAMIFICATION] Erro ao atribuir Docton Coins:', err);
+            }
+        }
     }
 
     /**

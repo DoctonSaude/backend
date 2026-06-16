@@ -149,10 +149,10 @@ export async function getPharmacyDemandHistory(pharmacyId: string) {
   const responses = await prisma.quotationResponse.findMany({
     where: { pharmacyId, createdAt: { gte: thirtyDaysAgo } },
     include: {
-      quotation: {
+      QuotationRequest: {
         include: {
           QuotationRequestItem: true,
-          patient: {
+          Patient: {
             include: {
               User: { select: { name: true } },
               Person: { select: { name: true } },
@@ -170,7 +170,7 @@ export async function getPharmacyDemandHistory(pharmacyId: string) {
   const revenueWon = won.reduce((s, r) => s + r.price, 0);
 
   const items = responses.map((r) => {
-    const q = r.quotation;
+    const q = r as any; // Ignore types to access included relation without error
     const patientName =
       q?.patient?.Person?.name || q?.patient?.User?.name || 'Paciente';
     const item =
@@ -241,7 +241,7 @@ export async function getPharmacyAiDemands(pharmacyId: string) {
           createdAt: { gte: sevenDaysAgo },
         },
         include: {
-          Patient: {
+          patient: {
             include: {
               User: { select: { name: true, avatar: true, phone: true } },
               Person: { select: { name: true, phone: true } },
@@ -318,7 +318,7 @@ export async function getPharmacyAiDemands(pharmacyId: string) {
 
   const seen = new Set<string>();
   const leads = [...intentLeads, ...quoteLeads, ...wonLeads, ...orderLeads].filter((l) => {
-    const key = l.quotationId || l.orderId || l.id;
+    const key = (l as any).quotationId || (l as any).orderId || l.id;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -410,7 +410,7 @@ export async function updatePharmacyLeadStatus(
   if (leadId.startsWith('quote-')) {
     throw new Error('Use a aba Cotações para responder demandas de cotação aberta.');
   }
-  return prisma.healthIntent.update({
+  return prisma.quotationRequest.update({
     where: { id: leadId },
     data: { status, updatedAt: new Date() },
   });

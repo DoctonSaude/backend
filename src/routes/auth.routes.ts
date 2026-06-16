@@ -152,8 +152,8 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
       // Prioridade: 1. planType (ex: Cortesia), 2. Subscription, 3. 'basic'
       if (patient?.planType && patient.planType !== 'Gratuito' && patient.planType !== 'Básico') {
         (userWithoutPassword as any).plan = patient.planType;
-      } else if (patient?.Subscription?.[0]?.Plan) {
-        (userWithoutPassword as any).plan = patient.Subscription[0].Plan.key;
+      } else if (patient?.subscriptions?.[0]?.plan) {
+        (userWithoutPassword as any).plan = patient.subscriptions[0].plan.key;
       } else {
         (userWithoutPassword as any).plan = patient?.planType || 'basic';
       }
@@ -191,8 +191,8 @@ router.get('/validate', async (req: Request, res: Response, next: NextFunction) 
             },
             Patient: {
               include: {
-                Subscription: {
-                  include: { Plan: true },
+                subscriptions: {
+                  include: { plan: true },
                   where: { status: 'ACTIVE' },
                   take: 1
                 }
@@ -227,8 +227,8 @@ router.get('/validate', async (req: Request, res: Response, next: NextFunction) 
           
           if (patient?.planType && patient.planType !== 'Gratuito' && patient.planType !== 'Básico') {
             (userWithoutPassword as any).plan = patient.planType;
-          } else if (patient?.Subscription?.[0]?.Plan) {
-            (userWithoutPassword as any).plan = patient.Subscription[0].Plan.key;
+          } else if (patient?.subscriptions?.[0]?.plan) {
+            (userWithoutPassword as any).plan = patient.subscriptions[0].plan.key;
           } else {
             (userWithoutPassword as any).plan = patient?.planType || 'basic';
           }

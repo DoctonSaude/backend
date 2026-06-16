@@ -31,7 +31,7 @@ export class PaymentService {
         // 2. Salvar no banco de dados
         const deposit = await prisma.pixDeposit.create({
             data: {
-                appointmentId,
+                appointment: { connect: { id: appointmentId } },
                 amount,
                 status: charge.status as any,
                 txId: charge.gatewayId,
@@ -53,9 +53,9 @@ export class PaymentService {
             include: {
                 appointment: {
                     include: {
-                        partner: {
+                        Partner: {
                             include: {
-                                person: true
+                                Person: true
                             }
                         }
                     }

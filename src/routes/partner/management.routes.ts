@@ -536,13 +536,22 @@ router.put('/revenue/happy-hour', authenticate, authorize('PARTNER'), async (req
     const partner = await prisma.partner.findFirst({ where: { userId } });
     if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
 
-    const updated = await prisma.partner.update({
-      where: { id: partner.id },
-      data: {
-        settings: {
-          ...(partner.settings as any || {}),
-          happyHourConfig
-        }
+    const updated = await prisma.happyHourConfig.upsert({
+      where: { partnerId: partner.id },
+      update: {
+        days: happyHourConfig.days || [],
+        startHour: happyHourConfig.startHour || 13,
+        endHour: happyHourConfig.endHour || 17,
+        discountPercent: happyHourConfig.discountPercent || 15,
+        enabled: happyHourConfig.enabled ?? false
+      },
+      create: {
+        partnerId: partner.id,
+        days: happyHourConfig.days || [],
+        startHour: happyHourConfig.startHour || 13,
+        endHour: happyHourConfig.endHour || 17,
+        discountPercent: happyHourConfig.discountPercent || 15,
+        enabled: happyHourConfig.enabled ?? false
       }
     });
 

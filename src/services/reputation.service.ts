@@ -25,10 +25,10 @@ function mapReview(r: {
   reply: string | null;
   replyDate: Date | null;
   createdAt: Date;
-  Patient: {
+  patient: {
     User: { name: string | null; avatar: string | null } | null;
   } | null;
-  Appointment: { dateTime: Date } | null;
+  appointment: { dateTime: Date } | null;
 }): PartnerReviewDto {
   return {
     id: r.id,
@@ -39,12 +39,12 @@ function mapReview(r: {
     createdAt: r.createdAt.toISOString(),
     patient: {
       user: {
-        name: r.Patient?.User?.name ?? 'Paciente',
-        avatar: r.Patient?.User?.avatar ?? undefined,
+        name: r.patient?.User?.name ?? 'Paciente',
+        avatar: r.patient?.User?.avatar ?? undefined,
       },
     },
     appointment: {
-      dateTime: (r.Appointment?.dateTime ?? r.createdAt).toISOString(),
+      dateTime: (r.appointment?.dateTime ?? r.createdAt).toISOString(),
     },
   };
 }
@@ -95,14 +95,14 @@ export class ReputationService {
     const reviews = await prisma.review.findMany({
       where: { partnerId },
       include: {
-        Patient: {
+        patient: {
           include: {
             User: {
               select: { name: true, avatar: true },
             },
           },
         },
-        Appointment: {
+        appointment: {
           select: { dateTime: true },
         },
       },
@@ -129,14 +129,14 @@ export class ReputationService {
         updatedAt: new Date(),
       },
       include: {
-        Patient: {
+        patient: {
           include: {
             User: {
               select: { name: true, avatar: true },
             },
           },
         },
-        Appointment: {
+        appointment: {
           select: { dateTime: true },
         },
       },

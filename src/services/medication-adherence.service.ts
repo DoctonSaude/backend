@@ -4,6 +4,13 @@ import {
   parseScheduledDateTime,
   findLogForSlot,
 } from './medication-calendar.service.js';
+import OpenAI from 'openai';
+
+function getOpenAI(): OpenAI | null {
+  const key = process.env.OPENAI_API_KEY;
+  if (key) return new OpenAI({ apiKey: key });
+  return null;
+}
 
 export type AdherencePeriod = 'week' | 'month';
 
@@ -357,4 +364,57 @@ export async function getMedicationAdherenceReport(
     },
     medications,
   };
+}
+
+export async function getLucasIntervention(patientId: string, report: MedicationAdherenceReport) {
+  const openai = getOpenAI();
+  if (!openai) {
+    return {
+      message: "Olá! Sou Lucas, seu farmacêutico digital. Continue registrando seus medicamentos para que eu possa acompanhar seu tratamento.",
+      riskLevel: report.summary.overallAdherence < 50 ? 'HIGH' : 'LOW',
+      suggestedActions: []
+    };
+  }
+
+  try {
+    const patientName = await prisma.patient.findUnique({
+      where: { id: patientId },
+      include: { User: { select: { name: true } } }
+    }).then(p => p?.User?.name || 'Paciente');
+
+    const prompt = `
+Você é Lucas, o IA Farmacêutico da Docton Saúde. Seu papel é analisar o relatório de adesão medicamentosa e dar uma orientação curta, acolhedora e prática.
+Paciente: ${patientName}
+Adesão Geral: ${report.summary.overallAdherence}%
+Medicamentos Ativos: ${report.summary.medicationCount}
+Doses Perdidas: ${report.summary.totalMissed}
+Sequência atual (streak): ${report.summary.longestStreak} dias.
+
+Regras:
+1. Responda em Português do Brasil de forma empática e direta.
+2. Não dê diagnósticos médicos, apenas oriente sobre a rotina de remédios.
+3. Se a adesão for < 70%, o tom deve ser de cuidado extra. Se for > 80%, parabenize.
+4. Retorne APENAS um JSON no formato:
+{
+  "message": "Mensagem do Lucas para o paciente",
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH",
+  "suggestedActions": ["Ação sugerida 1", "Ação sugerida 2"]
+}
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "system", content: prompt }],
+      response_format: { type: "json_object" }
+    });
+
+    return JSON.parse(response.choices[0]?.message?.content || '{}');
+  } catch (error) {
+    console.error("[Lucas IA] Erro ao analisar adesão:", error);
+    return {
+      message: "Não consegui analisar profundamente seus dados agora, mas estou de olho na sua rotina de medicamentos!",
+      riskLevel: "LOW",
+      suggestedActions: []
+    };
+  }
 }

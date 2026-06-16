@@ -319,7 +319,7 @@ Seja proativo em sugerir melhorias baseadas nos números.
       const patient = await prisma.patient.findUnique({
         where: { userId },
         include: {
-          HealthLog: { orderBy: { logDate: 'desc' }, take: 10 },
+          healthLogs: { orderBy: { createdAt: 'desc' } as any, take: 10 },
           Prescription: { where: { status: 'Ativo' } as any, take: 5 },
           Appointment: {
             where: { dateTime: { gte: new Date() }, status: { not: 'Cancelado' } },
@@ -333,12 +333,12 @@ Seja proativo em sugerir melhorias baseadas nos números.
       if (!patient) return { content: "Perfil de paciente não encontrado." };
 
       const patientName = patient.userId ? (await prisma.user.findUnique({ where: { id: userId } }))?.name : "Paciente";
-      const gender = patient.avatarPreference === 'MALE' ? 'Masculino' : 'Feminino';
-      const assistantName = patient.avatarPreference === 'MALE' ? 'Luan' : 'Luma';
+      const gender = patient.settings === 'MALE' ? 'Masculino' : 'Feminino';
+      const assistantName = 'Sofia';
 
       const systemPrompt = `
-Você é ${assistantName}, a assistente virtual inteligente da Luma Saúde (Docton Saúde). 
-Sua missão é ser uma companheira de saúde atenciosa, empática e proativa.
+Você é ${assistantName}, a assistente conselheira inteligente da Docton Saúde. 
+Sua missão é ser uma companheira de saúde atenciosa, empática e focada na jornada do paciente.
 
 PERSONALIDADE:
 - Calorosa, inspiradora e técnica quando necessário.
@@ -349,10 +349,10 @@ PERSONALIDADE:
 CONTEXTO DO PACIENTE (${patientName}):
 - Sexo do Avatar: ${gender}
 - Metas de Saúde: ${patient.healthGoals.join(', ') || 'Não definidas'}
-- Registros Recentes: ${patient.HealthLog.map(l => `${l.type}: ${l.value}`).join(', ') || 'Nenhum'}
-- Prescrições Ativas: ${patient.Prescription.map(p => p.medication).join(', ') || 'Nenhuma'}
-- Próximas Consultas: ${patient.Appointment.length} agendadas.
-- Cotações de Exame Abertas: ${patient.QuotationRequest.length} pendentes.
+- Registros Recentes: ${(patient as any).healthLogs?.map((l: any) => `${l.type}: ${l.value}`).join(', ') || 'Nenhum'}
+- Prescrições Ativas: ${(patient as any).Prescription?.map((p: any) => p.medication).join(', ') || 'Nenhuma'}
+- Próximas Consultas: ${(patient as any).Appointment?.length || 0} agendadas.
+- Cotações de Exame Abertas: ${(patient as any).QuotationRequest?.length || 0} pendentes.
 
 REGRAS:
 1. Identifique se o paciente precisa de uma cotação de exame ou medicamento. Se sim, sugira criar uma cotação.
@@ -445,7 +445,7 @@ Seja sempre empática.
         }
       });
 
-      return { content: finalContent, charts, actions, voice: true }; // Sempre voz para Luma se solicitado no MVP
+      return { content: finalContent, charts, actions, voice: true }; // Sempre voz para Sofia se solicitado no MVP
 
     } catch (error: any) {
       console.error("Erro na OpenAI (Patient):", error);
@@ -481,7 +481,7 @@ Seja sempre empática.
 
   private static async processPatientQuerySimple(query: string, userId: string) {
     const q = query.toLowerCase();
-    let content = "Olá! Eu sou a Luma. No momento estou operando em modo de economia de energia (sem chave de IA), mas posso anotar o que você precisa.";
+    let content = "Olá! Eu sou a Sofia. No momento estou operando em modo de economia de energia (sem chave de IA), mas posso anotar o que você precisa.";
     let intent: any = null;
     let actions: any[] = [];
 
@@ -549,3 +549,4 @@ Seja sempre empática.
     }
   }
 }
+

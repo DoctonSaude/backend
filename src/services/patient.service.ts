@@ -17,20 +17,20 @@ export class PatientService {
         const user = await prisma.user.findUnique({
             where: { id: userId },
             include: {
-                person: {
+                Person: {
                     select: {
-                        patient: {
+                        Patient: {
                             select: {
                                 id: true, userId: true, healthPoints: true, experiencePoints: true, level: true, levelTitle: true, levelTier: true, currentStreak: true, onboardingCompleted: true,
-                                Subscription: { where: { status: 'ACTIVE' }, include: { Plan: { select: { name: true } } }, take: 1 }
+                                subscriptions: { where: { status: 'ACTIVE' }, include: { plan: { select: { name: true } } }, take: 1 }
                             }
                         }
                     }
                 },
-                patient: {
+                Patient: {
                     select: {
                         id: true, userId: true, healthPoints: true, experiencePoints: true, level: true, levelTitle: true, levelTier: true, currentStreak: true, onboardingCompleted: true,
-                        Subscription: { where: { status: 'ACTIVE' }, include: { Plan: { select: { name: true } } }, take: 1 }
+                        subscriptions: { where: { status: 'ACTIVE' }, include: { plan: { select: { name: true } } }, take: 1 }
                     }
                 }
             }
@@ -38,7 +38,7 @@ export class PatientService {
 
         // Prioridade: person.patient (backend legado) → patient direto (website/novo registro)
         // @ts-ignore - Prisma relation naming mismatch
-        let patient = user?.person?.patient ?? user?.patient ?? null;
+        let patient = user?.Person?.Patient ?? user?.Patient ?? null;
 
         if (!patient) {
             // Último recurso: auto-criar registro de paciente para não deslogar o usuário
@@ -46,7 +46,7 @@ export class PatientService {
             try {
                 patient = await prisma.patient.create({
                     data: {
-                        userId,
+                        User: { connect: { id: userId } },
                         archetype: 'GENERAL',
                         healthPoints: 0,
                         experiencePoints: 0,
@@ -54,7 +54,7 @@ export class PatientService {
                         onboardingCompleted: false
                     },
                     include: {
-                        Subscription: { where: { status: 'ACTIVE' }, include: { Plan: true }, take: 1 }
+                        subscriptions: { where: { status: 'ACTIVE' }, include: { plan: true }, take: 1 }
                     }
                 }) as any;
             } catch (createErr) {
@@ -179,7 +179,7 @@ export class PatientService {
                 name: user.name,
                 avatar: user.avatar,
                 email: user.email,
-                Plan: (patient as any).Subscription?.[0]?.Plan?.name || 'Gratuito'
+                Plan: (patient as any).subscriptions?.[0]?.plan?.name || 'Gratuito'
             },
             stats: {
                 totalAppointments,
@@ -230,7 +230,7 @@ export class PatientService {
     /**
      * Helper to ensure a Patient record exists for a given userId
      */
-    private async ensurePatient(userId: string) {
+    public async ensurePatient(userId: string) {
       // 1. Try to find via direct patient relation first
       let patient = await prisma.patient.findUnique({
         where: { userId },
@@ -255,11 +255,13 @@ export class PatientService {
       console.log(`[PatientService] Creating missing Patient record for userId: ${userId}`);
       patient = await prisma.patient.create({
         data: {
-          userId,
-          personId: user?.personId ?? null,
+          User: { connect: { id: userId } },
+          ...(user?.personId ? { Person: { connect: { id: user.personId } } } : {}),
           archetype: 'GENERAL',
           healthPoints: 0,
           experiencePoints: 0,
+          level: 1,
+          onboardingCompleted: false
         },
       });
 

@@ -48,7 +48,7 @@ export class GrowthEngineService {
 
     // 4. Taxa de Recompra (baseado em UserProductStats se disponível para o inquilino/parceiro)
     // Nota: Como UserProductStats é vinculado ao User, precisamos buscar via usuários vinculados ao parceiro
-    // Para simplificar no MVP, buscaremos pedidos de farmácia vinculados à tenantId se existir
+    // Para simplificar no MVP, buscaremos pedidos de farmácia vinculados à economicGroupId se existir
     const stats = await prisma.userProductStats.count({
       where: { isRecurring: true }
     });
@@ -184,7 +184,7 @@ export class GrowthEngineService {
         objective: template.objective,
         status: 'ACTIVE',
         targetAudience: audienceFilter,
-        content: template.baseContent || template.content,
+        content: template.baseContent || null,
         startedAt: new Date()
       }
     });
@@ -288,7 +288,7 @@ export class GrowthEngineService {
     let sentCount = 0;
     const content = (campaign.content as any)?.copy || campaign.content || 'Olá! Temos uma novidade para você.';
 
-    // Disparar via WhatsApp (InstanceName = partnerId para ser multitenant no futuro ou admin para MVP)
+    // Disparar via WhatsApp (InstanceName = partnerId para ser multieconomicGroup no futuro ou admin para MVP)
     // No MVP usaremos a primeira conexão ativa 'main' ou personalizada do parceiro
     const connection = await prisma.adminWhatsappConnection.findFirst({
       where: { status: 'CONNECTED' }

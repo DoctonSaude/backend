@@ -105,7 +105,7 @@ export class QuotePaymentService {
                     (payment as any).paidAt = new Date();
                 }
                 else if (asaasCharge.status === 'OVERDUE') {
-                    await (prisma as any).quotePayment.update({
+                    await (prisma as any).quotationPayment.update({
                         where: { id: paymentId },
                         data: { status: 'EXPIRED' }
                     });
@@ -133,7 +133,7 @@ export class QuotePaymentService {
     async confirmPayment(paymentId: string) {
         const now = new Date();
         await (prisma as any).$transaction(async (tx: any) => {
-            await (tx as any).quotePayment.update({
+            await (tx as any).quotationPayment.update({
                 where: { id: paymentId },
                 data: {
                     status: 'PAID',
@@ -141,9 +141,9 @@ export class QuotePaymentService {
                 }
             });
             const payment = await (tx as any).quotationPayment.findUnique({ where: { id: paymentId } });
-            if (payment?.quoteId) {
+            if (payment?.quotationId) {
                 await (tx as any).quotationRequest.update({
-                    where: { id: payment.quoteId },
+                    where: { id: payment.quotationId },
                     data: {
                         status: 'PAID'
                     }
@@ -177,6 +177,12 @@ export class QuotePaymentService {
             data: { status: 'CANCELLED' }
         });
     }
+
+    async getPatientPayments(patientId: string, page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
+        return this.listPayments({ patientId, skip, take: limit });
+    }
+
     /**
      * Lista pagamentos do paciente
      */

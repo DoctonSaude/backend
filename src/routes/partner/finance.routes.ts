@@ -19,7 +19,7 @@ router.get('/financial-data', authenticate, authorize('PARTNER'), async (req: an
       where: { partnerId: partner.id }
     });
 
-    if (!data) return res.status(404).json({ error: 'Dados financeiros não encontrados' });
+    if (!data) return res.json(null);
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao buscar dados financeiros' });

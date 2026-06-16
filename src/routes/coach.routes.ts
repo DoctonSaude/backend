@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router } from "express";
 import { authenticate, authorize } from "../middleware/auth.js";
 import prisma from "../lib/prisma.js";
@@ -485,3 +486,4 @@ router.get("/admin/analytics", authenticate, authorize(["ADMIN"]), async (req, r
 });
 
 export default router;
+

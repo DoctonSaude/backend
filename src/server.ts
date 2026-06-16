@@ -16,7 +16,7 @@ import 'dotenv/config';
 
 import express, { Request, Response, NextFunction } from 'express';
 import { Server } from 'http';
-console.log('!!! SERVER BOOT V9 - GAMIFICATION STABILIZATION ACTIVE !!!');
+console.log('!!! SERVER BOOT V12 - PRICES FIX ACTIVE !!!');
 
 export const app = express();
 
@@ -31,13 +31,14 @@ app.get('/api/nuclear-test-final', (req, res) => {
 app.get('/api/ping', (req, res) => {
   res.status(200).json({
     status: 'ok',
-    version: 'v10-crud-ready',
+    version: 'v12-prices-fix',
     deployed_at: new Date().toISOString(),
-    message: 'Sistema de Blog e CRUDs administrativos ativados com sucesso.'
+    message: 'Correção de preços aplicada. PartnerService consultationPrice e Challenge capitalização corrigidos.'
   });
 });
 
 import cors from 'cors';
+import compression from 'compression';
 import { env } from './config/env';
 import { isOriginAllowed } from './config/cors.js';
 
@@ -56,6 +57,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Tenant-Id', 'Cache-Control', 'Pragma'],
   maxAge: 86400
 }));
+
+// Middleware de Compressão
+app.use(compression());
 
 // Middleware de diagnóstico (OPCIONAL)
 app.use((req, res, next) => {
@@ -98,6 +102,7 @@ import { FinanceJob } from './jobs/finance.job.js';
 import prisma from './lib/prisma.js';
 import { performanceLogger } from './middleware/logger.middleware.js';
 import { checkRedisHealth } from './lib/redis.js';
+import cronService from './services/cron.service.js';
 
 const httpServer = createServer(app);
 const PORT = Number(process.env.PORT) || 3001;
@@ -233,21 +238,21 @@ app.get('/api/health', async (_req, res) => {
 
 // --- Diagnóstico Global ---
 app.use((req, res, next) => {
-  res.setHeader('X-Express-Server', 'v8-final-stabilization');
+  res.setHeader('X-Express-Server', 'v11-marketing-active');
   next();
 });
 
 app.use(errorHandler);
 
-// Handler 404 Personalizado para Diagnóstico Nuclear
-app.use((req, res) => {
+// Rota não encontrada genérica para API
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     error: 'Not Found in Express Backend',
     message: 'Esta rota não existe no servidor Express.',
     path: req.path,
     method: req.method,
     timestamp: new Date().toISOString(),
-    backend_version: 'v8-final-stabilization'
+    backend_version: 'v11-marketing-active'
   });
 });
 
@@ -295,6 +300,9 @@ export const startServer = () => {
     console.log('PUBLIC_PORT:', process.env.PUBLIC_PORT);
 
     initializeNotifications(server);
+    
+    // Iniciar serviço de cron
+    cronService.start();
 
     // CRON JOBS DELEGADOS PARA O N8N (MOTOR DE ORQUESTRAÇÃO)
     // Desativado no backend: o n8n será responsável por processos como 

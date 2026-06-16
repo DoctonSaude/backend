@@ -62,10 +62,8 @@ router.post('/quotations', authenticate, authorize('PATIENT'), async (req, res) 
     const socketData = {
       type: 'NEW_QUOTATION',
       id: quotation.id,
-      patientName: req.user.name || 'Paciente',
-      urgency: quotation.urgency
+      patientName: 'Paciente'
     };
-    
     // Notifica todas as farmácias online
     SocketService.sendToPartners('newQuotation', socketData);
 
@@ -395,8 +393,7 @@ router.put('/luma-leads/:id', ...pharmacyAuth, async (req, res) => {
     await updatePharmacyLeadStatus(id, status);
     const full = await prisma.healthIntent.findUnique({
       where: { id },
-      include: {
-        patient: {
+      include: { patient: {
           include: {
             User: { select: { name: true, avatar: true, phone: true } },
             Person: { select: { name: true, phone: true } },
@@ -443,7 +440,6 @@ router.get(['/open-quotations', '/quotations'], authenticate, authorize('PHARMAC
         ...q,
         items: q.QuotationRequestItem || [],
         Patient: q.patient, // Para Cotacoes.tsx
-        patient: q.patient, // Para Pedidos.tsx
         // Campos específicos para o Radar (Pedidos.tsx)
         medicamentName: q.medicamentName || firstItem?.name || 'Medicamento',
         quantity: q.quantity || firstItem?.quantity || 1,
@@ -473,9 +469,9 @@ router.get('/my-responses', authenticate, authorize('PHARMACY'), async (req, res
     
     res.json(responses.map((r: any) => ({
       ...r,
-      QuotationRequest: r.quotation ? {
-        ...r.quotation,
-        items: r.quotation.QuotationRequestItem
+      QuotationRequest: r.QuotationRequest ? {
+        ...r.QuotationRequest,
+        items: r.QuotationRequest.QuotationRequestItem
       } : null
     })));
   } catch (error: any) {
@@ -497,10 +493,10 @@ router.get('/won-quotations', authenticate, authorize('PHARMACY'), async (req, r
     
     res.json(responses.map((r: any) => ({
       ...r,
-      QuotationRequest: r.quotation ? {
-        ...r.quotation,
-        items: r.quotation.QuotationRequestItem,
-        Patient: r.quotation.patient // Mapeia patient (db) para Patient (frontend)
+      QuotationRequest: r.QuotationRequest ? {
+        ...r.QuotationRequest,
+        items: r.QuotationRequest.QuotationRequestItem,
+        Patient: r.QuotationRequest.patient // Mapeia patient (db) para Patient (frontend)
       } : null
     })));
   } catch (error: any) {
@@ -538,10 +534,10 @@ router.post('/quotations/:id/respond', ...pharmacyAuth, async (req, res) => {
     try {
       const quotation = await prisma.quotationRequest.findUnique({
         where: { id },
-        include: { patient: { select: { userId: true } } }
+        include: { Patient: { select: { userId: true } } }
       });
-      if (quotation?.patient?.userId) {
-        SocketService.sendToUser(quotation.patient.userId, 'pharmacyQuoteUpdate', {
+      if (quotation?.Patient?.userId) {
+        SocketService.sendToUser(quotation.Patient.userId, 'pharmacyQuoteUpdate', {
           quotationId: id,
           pharmacyName: pharmacy.name,
           price: response.price,
@@ -778,11 +774,10 @@ router.get('/orders/delivery', ...pharmacyAuth, async (req, res) => {
         status: 'ACCEPTED'
       },
       include: {
-        quotation: {
-          include: {
-            patient: {
+        QuotationRequest: {
+          include: { Patient: {
               select: {
-                user: { select: { name: true, phone: true } },
+                User: { select: { name: true, phone: true } },
                 address: true,
                 city: true
               }
@@ -985,8 +980,7 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
         pharmacyId: pharmacy.id,
         status: { notIn: ['CANCELLED'] },
       },
-      include: {
-        Patient: {
+      include: { patient: {
           select: {
             userId: true,
             address: true,
@@ -1017,7 +1011,7 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
     }
 
     const mappedDirect = directOrders.map((order) => {
-      const patientData = order.Patient?.Person || order.Patient?.User;
+      const patientData = order.patient?.Person || order.patient?.User;
       const itemsFromDb =
         order.PharmacyOrderItem?.map((item) => ({
           id: item.id,
@@ -1048,7 +1042,7 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
 
       const deliveryAddress =
         addressText ||
-        formatPatientDeliveryAddress(order.Patient) ||
+        formatPatientDeliveryAddress(order.patient) ||
         'Retirada / entrega — combinar endereço com o paciente';
 
       return {
@@ -1062,7 +1056,7 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
         paymentMethod: order.paymentMethod || 'Online',
         deliveryAddress,
         itemsSummary: order.deliveryAddress,
-        patient: {
+        Patient: {
           user: {
             name: patientData?.name || 'Paciente Docton',
             phone: patientData?.phone || '',
@@ -1081,10 +1075,10 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
           status: { in: ['ACCEPTED', 'RECEIVED', 'SEPARATING', 'DELIVERING', 'FINISHED', 'PENDING_PAYMENT'] },
         },
         include: {
-          quotation: {
+          QuotationRequest: {
             include: {
               QuotationRequestItem: true,
-              patient: {
+              Patient: {
                 include: {
                   User: { select: { name: true, phone: true } },
                   Person: { select: { name: true, phone: true } },
@@ -1097,7 +1091,7 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
       });
 
       mappedQuotes = quoteOrders.map((o: any) => {
-        const q = o.quotation;
+        const q = o.QuotationRequest;
         const patientData = q?.patient?.Person || q?.patient?.User;
 
         return {
@@ -1109,8 +1103,8 @@ router.get('/orders', ...pharmacyAuth, async (req, res) => {
           createdAt: o.createdAt,
           paymentMethod: 'Online',
           deliveryAddress: q?.description || 'Retirada ou entrega',
-          patient: {
-            user: {
+          Patient: {
+            User: {
               name: patientData?.name || 'Paciente Docton',
               phone: patientData?.phone || '',
             },
@@ -1150,7 +1144,7 @@ router.put('/orders/:id/status', ...pharmacyAuth, async (req, res) => {
 
   const directOrder = await prisma.pharmacyOrder.findFirst({
       where: { id, pharmacyId: pharmacy.id },
-      include: { Patient: { select: { userId: true } } },
+      include: { patient: { select: { userId: true } } },
     });
 
     if (directOrder) {
@@ -1165,7 +1159,7 @@ router.put('/orders/:id/status', ...pharmacyAuth, async (req, res) => {
         status: mapPharmacyOrderStatusForUi(updated.status),
       });
 
-      const patientUserId = directOrder.Patient?.userId;
+      const patientUserId = directOrder.patient?.userId;
       if (patientUserId) {
         try {
           await inAppNotificationService.createNotification({
@@ -1187,9 +1181,8 @@ router.put('/orders/:id/status', ...pharmacyAuth, async (req, res) => {
     const order = await prisma.quotationResponse.findUnique({
       where: { id },
       include: {
-        quotation: {
-          include: {
-            patient: { select: { userId: true } },
+        QuotationRequest: {
+          include: { Patient: { select: { userId: true } },
           },
         },
       },
@@ -1210,7 +1203,7 @@ router.put('/orders/:id/status', ...pharmacyAuth, async (req, res) => {
       status: mapPharmacyOrderStatusForUi(updated.status),
     });
 
-    const patientUserId = order.quotation?.patient?.userId;
+    const patientUserId = order.QuotationRequest?.Patient?.userId;
     if (patientUserId) {
       try {
         const statusLabels: Record<string, string> = {
@@ -1425,8 +1418,8 @@ router.get('/advanced-report', ...pharmacyAuth, async (req, res) => {
       const prodId = item.productId;
       if (!productSalesMap.has(prodId)) {
         productSalesMap.set(prodId, { 
-          name: item.product.name, 
-          cat: item.product.category, 
+          name: item.PharmacyProduct?.name || 'Produto', 
+          cat: item.PharmacyProduct?.category || 'Outros', 
           sales: 0 
         });
       }
@@ -1788,9 +1781,8 @@ router.get('/crm/customers', ...pharmacyAuth, async (req, res) => {
 
     // 1. Busca Pedidos Diretos (PharmacyOrder)
     const directOrders = await prisma.pharmacyOrder.findMany({
-      where: { pharmacyId: pharmacy.id, status: { in: ['DELIVERED', 'FINISHED'] } },
-      include: {
-        Patient: {
+      where: { pharmacyId: pharmacy.id, status: 'FINISHED' },
+      include: { patient: {
           select: {
             id: true,
             User: { select: { name: true, phone: true } },
@@ -1806,9 +1798,8 @@ router.get('/crm/customers', ...pharmacyAuth, async (req, res) => {
     const quoteOrders = await prisma.quotationResponse.findMany({
       where: { pharmacyId: pharmacy.id, status: { in: ['ACCEPTED', 'RECEIVED', 'SEPARATING', 'DELIVERING', 'FINISHED'] } },
       include: {
-        quotation: {
-          include: {
-            patient: {
+        QuotationRequest: {
+          include: { Patient: {
               select: {
                 id: true,
                 User: { select: { name: true, phone: true } },
@@ -1827,7 +1818,7 @@ router.get('/crm/customers', ...pharmacyAuth, async (req, res) => {
 
     // Processar pedidos diretos
     directOrders.forEach(order => {
-      const p = order.Patient;
+      const p = order.patient;
       if (!p) return;
       const patientData = p.Person || p.User;
       const itemName = order.PharmacyOrderItem?.[0]?.PharmacyProduct?.name || 'Medicamento';
@@ -1856,8 +1847,8 @@ router.get('/crm/customers', ...pharmacyAuth, async (req, res) => {
 
     // Processar cotações aceitas
     quoteOrders.forEach(o => {
-      const q = o.quotation;
-      const p = q?.patient;
+      const q = o.QuotationRequest;
+      const p = q?.Patient;
       if (!p) return;
       const patientData = p.Person || p.User;
       const itemName = q.QuotationRequestItem?.[0]?.name || 'Medicamento';
@@ -1895,3 +1886,4 @@ router.get('/crm/customers', ...pharmacyAuth, async (req, res) => {
 
 
 export default router;
+

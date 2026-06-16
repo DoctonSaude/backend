@@ -28,7 +28,7 @@ declare global {
         role: string;
         email?: string;
         personId?: string;
-        tenantId?: string;
+        economicGroupId?: string;
       };
     }
   }
@@ -106,7 +106,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           role: true,
           email: true,
           personId: true,
-          tenantId: true
+          economicGroupId: true
         }
       });
       if (!user) {
@@ -122,7 +122,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         role: user.role,
         email: user.email,
         personId: user.personId || undefined,
-        tenantId: user.tenantId || undefined
+        economicGroupId: user.economicGroupId || undefined
       };
 
       logger.debug('[auth] user authenticated', { userId: user.id, role: user.role });
@@ -138,10 +138,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         tokenUserId 
       });
       
-      return res.status(500).json({ 
-        error: 'Erro interno ao validar autenticação',
-        details: env.NODE_ENV === 'development' ? msg : undefined
-      });
+      // Passa para o error handler global para que o interceptador de isDbError
+      // possa tratar falhas de banco e retornar o modo fallback
+      return next(lookupErr);
     }
   } catch (error: any) {
     // CORREÇÃO: Tratamento específico para diferentes tipos de erro com logs para diagnóstico

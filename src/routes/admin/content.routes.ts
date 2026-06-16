@@ -2,8 +2,11 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import prisma from '../../lib/prisma.js';
+import multer from 'multer';
+import { storageService } from '../../services/storage.service.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 const adminAuth = (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) ? [] : [authenticate, authorize('ADMIN')];
 
 // --- Contact Messages ---
@@ -53,6 +56,27 @@ router.get('/videos', ...adminAuth, async (req, res) => {
     return res.json(videos);
   } catch (error) {
     res.json([]);
+  }
+});
+
+/**
+ * @route POST /api/admin/videos/upload
+ */
+router.post('/videos/upload', ...adminAuth, upload.single('video'), async (req: any, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum vídeo enviado' });
+    }
+    const publicUrl = await storageService.uploadFile(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      'videos'
+    );
+    return res.json({ url: publicUrl });
+  } catch (error) {
+    console.error('Error uploading video:', error);
+    return res.status(500).json({ error: 'Erro no upload do vídeo' });
   }
 });
 
@@ -111,6 +135,27 @@ router.get('/blog/posts', ...adminAuth, async (req, res) => {
 });
 
 /**
+ * @route POST /api/admin/blog/posts/image
+ */
+router.post('/blog/posts/image', ...adminAuth, upload.single('image'), async (req: any, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+    }
+    const publicUrl = await storageService.uploadFile(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      'blog'
+    );
+    return res.json({ url: publicUrl });
+  } catch (error) {
+    console.error('Error uploading blog image:', error);
+    return res.status(500).json({ error: 'Erro no upload da imagem' });
+  }
+});
+
+/**
  * @route POST /api/admin/blog/posts
  */
 router.post('/blog/posts', ...adminAuth, async (req, res) => {
@@ -163,6 +208,116 @@ router.post('/blog/posts/:id/view', async (req, res) => {
     return res.json({ views: post.views });
   } catch (error) {
     res.status(404).json({ error: 'Post não encontrado' });
+  }
+});
+
+// --- AiInsights ---
+
+/**
+ * @route GET /api/admin/content/ai-insights
+ */
+router.get('/ai-insights', ...adminAuth, async (req, res) => {
+  try {
+    const insights = await prisma.aiInsight.findMany({ orderBy: { priority: 'asc' } });
+    return res.json(insights);
+  } catch (error) {
+    console.error('Error fetching AI Insights:', error);
+    res.json([]);
+  }
+});
+
+/**
+ * @route POST /api/admin/content/ai-insights
+ */
+router.post('/ai-insights', ...adminAuth, async (req, res) => {
+  try {
+    const insight = await prisma.aiInsight.create({ data: req.body });
+    return res.status(201).json(insight);
+  } catch (error) {
+    console.error('Error creating AI Insight:', error);
+    res.status(500).json({ error: 'Erro ao criar AI Insight' });
+  }
+});
+
+/**
+ * @route PUT /api/admin/content/ai-insights/:id
+ */
+router.put('/ai-insights/:id', ...adminAuth, async (req, res) => {
+  try {
+    const insight = await prisma.aiInsight.update({
+      where: { id: req.params.id },
+      data: req.body
+    });
+    return res.json(insight);
+  } catch (error) {
+    res.status(404).json({ error: 'AI Insight não encontrado' });
+  }
+});
+
+/**
+ * @route DELETE /api/admin/content/ai-insights/:id
+ */
+router.delete('/ai-insights/:id', ...adminAuth, async (req, res) => {
+  try {
+    await prisma.aiInsight.delete({ where: { id: req.params.id } });
+    return res.json({ success: true });
+  } catch (error) {
+    res.status(404).json({ error: 'AI Insight não encontrado' });
+  }
+});
+
+// --- Automated Reports ---
+
+/**
+ * @route GET /api/admin/content/automated-reports
+ */
+router.get('/automated-reports', ...adminAuth, async (req, res) => {
+  try {
+    const reports = await prisma.automatedReport.findMany({ orderBy: { createdAt: 'desc' } });
+    return res.json(reports);
+  } catch (error) {
+    console.error('Error fetching automated reports:', error);
+    res.json([]);
+  }
+});
+
+/**
+ * @route POST /api/admin/content/automated-reports
+ */
+router.post('/automated-reports', ...adminAuth, async (req, res) => {
+  try {
+    const report = await prisma.automatedReport.create({ data: req.body });
+    return res.status(201).json(report);
+  } catch (error) {
+    console.error('Error creating automated report:', error);
+    res.status(500).json({ error: 'Erro ao criar automated report' });
+  }
+});
+
+/**
+ * @route PUT /api/admin/content/automated-reports/:id
+ */
+router.put('/automated-reports/:id', ...adminAuth, async (req, res) => {
+  try {
+    const report = await prisma.automatedReport.update({
+      where: { id: req.params.id },
+      data: req.body
+    });
+    return res.json(report);
+  } catch (error) {
+    res.status(404).json({ error: 'Automated report não encontrado' });
+  }
+});
+
+/**
+ * @route DELETE /api/admin/content/automated-reports/:id
+ */
+router.delete('/automated-reports/:id', ...adminAuth, async (req, res) => {
+  try {
+    await prisma.automatedReport.delete({ where: { id: req.params.id } });
+    return res.json({ success: true });
+  } catch (error) {
+    res.status(404).json({ error: 'Automated report não encontrado' });
   }
 });
 

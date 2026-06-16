@@ -30,7 +30,7 @@ export const UserCrud = {
         name: true,
         role: true,
         personId: true,
-        tenantId: true,
+        economicGroupId: true,
         avatar: true
       }
     });

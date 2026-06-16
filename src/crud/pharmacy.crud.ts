@@ -6,7 +6,7 @@ import { PharmacyData } from '../types/common.js';
 
 export const PharmacyCrud = {
     /**
-     * Cria uma nova farmácia vinculada a um tenant
+     * Cria uma nova farmácia vinculada a um economicGroup
      */
     async create(data: PharmacyData) {
         try {
@@ -25,9 +25,9 @@ export const PharmacyCrud = {
     /**
      * Lista farmácias de um inquilino
      */
-    async listByTenant(tenantId: string) {
+    async listByEconomicGroup(economicGroupId: string) {
         return await prisma.pharmacy.findMany({
-            where: { tenantId } as any,
+            where: { economicGroupId } as any,
             include: { stocks: { include: { product: true } } } as any
         });
     },

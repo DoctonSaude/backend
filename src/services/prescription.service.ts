@@ -12,8 +12,8 @@ export class PrescriptionService {
         // Adaptado ao schema atual: usando 'instructions' ou 'medications' JSON
         return await prisma.prescription.create({
             data: {
-                patientId: params.patientId,
-                partnerId: params.partnerId,
+                Patient: { connect: { id: params.patientId } },
+                Partner: { connect: { id: params.partnerId } },
                 medications: params.items,
                 status: 'Ativo'
             }
@@ -40,10 +40,10 @@ export class PrescriptionService {
         return await prisma.prescription.findMany({
             where: { partnerId },
             include: {
-                patient: {
+                Patient: {
                     select: {
                         id: true,
-                        user: { select: { name: true, avatar: true } }
+                        User: { select: { name: true, avatar: true } }
                     }
                 }
             },

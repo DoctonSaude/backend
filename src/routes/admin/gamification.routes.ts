@@ -124,4 +124,16 @@ router.get('/loyalty/tiers', ...adminAuth, async (req, res) => {
   }
 });
 
+/**
+ * @route DELETE /api/admin/rewards/:id
+ */
+router.delete('/rewards/:id', ...adminAuth, async (req, res) => {
+  try {
+    await prisma.reward.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao deletar recompensa' });
+  }
+});
+
 export default router;

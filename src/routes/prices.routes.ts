@@ -8,8 +8,19 @@ import { authenticate, authorize } from '../middleware/auth.js';
 const router = Router();
 router.use(authenticate, authorize('ADMIN'));
 
+// Helper para executar em chunks (evitar gargalos)
+const processInChunks = async <T, R>(items: T[], chunkSize: number, processor: (item: T) => Promise<R>) => {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+        const chunk = items.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(chunk.map(processor));
+        results.push(...chunkResults);
+    }
+    return results;
+};
+
 // Sync PartnerService with Supabase
-const syncPartnerServiceWithSupabase = async (service: any, operation: 'create' | 'update' | 'delete') => {
+export const syncPartnerServiceWithSupabase = async (service: any, operation: 'create' | 'update' | 'delete') => {
     if (!supabase) {
         console.warn('Supabase client not initialized - skipping PartnerService sync');
         return;
@@ -124,22 +135,43 @@ const syncBoostPriceWithSupabase = async (boostPrice: any, operation: 'create' |
 // Get Prices (PartnerServices)
 router.get('/', async (req, res) => {
     try {
-        const services = await prisma.partnerService.findMany({
-            include: {
-                partner: {
-                    select: { name: true, consultationPrice: true }
+        let services = [];
+        try {
+            // First attempt with Partner include
+            services = await prisma.partnerService.findMany({
+                include: {
+                    Partner: {
+                        select: { name: true }
+                    }
                 },
-                serviceCategory: {
-                    select: { name: true, defaultMarkup: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
+                orderBy: { createdAt: 'desc' }
+            });
+        } catch (includeError) {
+            console.warn('[Prices] Warning: Query with include failed, falling back to basic query.', includeError);
+            // Fallback without include
+            services = await prisma.partnerService.findMany({
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+
+        // Map uppercase Prisma relations to lowercase for the frontend
+        const mappedServices = services.map((s: any) => {
+            const mapped = { ...s };
+            if (mapped.Partner) {
+                mapped.partner = { name: mapped.Partner.name };
+                delete mapped.Partner;
+            }
+            if (mapped.ServiceCategory) {
+                mapped.serviceCategory = mapped.ServiceCategory;
+                delete mapped.ServiceCategory;
+            }
+            return mapped;
         });
 
-        res.json({ data: services });
-    } catch (error) {
-        console.error('Error getting prices:', error);
-        res.status(500).json({ error: 'Failed to fetch prices' });
+        res.json({ data: mappedServices });
+    } catch (error: any) {
+        console.error('[Prices] Critical Error getting prices:', error);
+        res.status(500).json({ error: 'Failed to fetch prices', details: error?.message || 'Unknown error' });
     }
 });
 
@@ -163,10 +195,10 @@ router.post('/', async (req, res) => {
         const data = schema.parse(req.body);
         console.log('[Prices] Creating with data:', JSON.stringify(data));
 
-        // Calcular preço final (venda) se tiver repasse e markup (SOMA DIRETA)
+        // Calcular preço final (venda) se tiver repasse e markup (como PERCENTUAL)
         let calculatedPrice = data.basePrice;
         if (data.partnerPayout !== undefined && data.doctonFeePercent !== undefined) {
-            calculatedPrice = data.partnerPayout + data.doctonFeePercent;
+            calculatedPrice = data.partnerPayout * (1 + data.doctonFeePercent / 100);
         }
 
         const service = await prisma.partnerService.create({
@@ -190,8 +222,8 @@ router.post('/', async (req, res) => {
                 serviceCategoryId: data.serviceCategoryId
             },
             include: {
-                partner: { select: { name: true } },
-                serviceCategory: { select: { name: true } }
+                Partner: { select: { name: true } },
+                ServiceCategory: { select: { name: true } }
             }
         });
 
@@ -228,16 +260,17 @@ router.put('/:id', async (req, res) => {
 
         // Buscar serviço atual para cálculo se necessário
         const current = await prisma.partnerService.findUnique({ where: { id } });
-        if (!current) return res.status(404).json({ error: 'Serviço não encontrado' });
+        const currentService = await prisma.partnerService.findUnique({ where: { id } });
+        if (!currentService) return res.status(404).json({ error: 'Serviço não encontrado' });
 
         const updateData: any = { ...data };
 
         // Recalcular preço se repasse ou markup mudarem
-        const payout = data.partnerPayout !== undefined ? data.partnerPayout : current.partnerPayout;
-        const markup = data.doctonFeePercent !== undefined ? data.doctonFeePercent : current.doctonFeePercent;
+        let payoutValue = data.partnerPayout !== undefined ? data.partnerPayout : (currentService.partnerPayout || currentService.price);
+        let markupValue = data.doctonFeePercent !== undefined ? data.doctonFeePercent : currentService.doctonFeePercent;
 
-        if (payout !== null && markup !== null && payout !== undefined && markup !== undefined) {
-            const calculatedPrice = payout + markup;
+        if (payoutValue !== null && markupValue !== null && markupValue !== undefined) {
+            const calculatedPrice = payoutValue * (1 + markupValue / 100);
             updateData.price = calculatedPrice;
             updateData.basePrice = calculatedPrice;
         } else if (data.basePrice !== undefined) {
@@ -248,8 +281,8 @@ router.put('/:id', async (req, res) => {
             where: { id },
             data: updateData,
             include: {
-                partner: { select: { name: true } },
-                serviceCategory: { select: { name: true } }
+                Partner: { select: { name: true } },
+                ServiceCategory: { select: { name: true } }
             }
         });
 
@@ -309,21 +342,21 @@ router.post('/sync-discounts', async (req, res) => {
         // Primeiro, buscar todos os serviços para depois sincronizar individualmente
         const services = await prisma.partnerService.findMany();
         
-        // Atualizar cada serviço individualmente e sincronizar com Supabase
+        // Atualizar cada serviço em chunks para ser muito mais rápido
         let syncCount = 0;
-        for (const service of services) {
+        await processInChunks(services, 20, async (service) => {
             const updated = await prisma.partnerService.update({
                 where: { id: service.id },
                 data: updateData,
                 include: {
-                    partner: { select: { name: true } },
-                    serviceCategory: { select: { name: true } }
+                    Partner: { select: { name: true } },
+                    ServiceCategory: { select: { name: true } }
                 }
             });
             
             await syncPartnerServiceWithSupabase(updated, 'update');
             syncCount++;
-        }
+        });
 
         console.log(`[Prices] Synced discounts to ${syncCount} services`);
 
@@ -337,6 +370,124 @@ router.post('/sync-discounts', async (req, res) => {
     } catch (error) {
         console.error('Error syncing discounts:', error);
         res.status(500).json({ error: 'Falha ao sincronizar descontos' });
+    }
+});
+
+// Sincronizar Markup Padrão para TODOS os serviços
+router.post('/sync-markup', async (req, res) => {
+    try {
+        const schema = z.object({
+            globalMarkup: z.number().min(0).optional().nullable(),
+        });
+
+        const { globalMarkup } = schema.parse(req.body);
+        console.log(`[Prices] Syncing markup (globalMarkup=${globalMarkup})`);
+
+        const services = await prisma.partnerService.findMany({
+            include: { ServiceCategory: true, Partner: true }
+        });
+        
+        let syncCount = 0;
+        let skipCount = 0;
+
+        await processInChunks(services, 20, async (service) => {
+            let targetMarkup: number | null | undefined = undefined;
+
+            if (globalMarkup !== undefined && globalMarkup !== null) {
+                targetMarkup = globalMarkup;
+            } else if (service.ServiceCategory && service.ServiceCategory.defaultMarkup !== null) {
+                targetMarkup = service.ServiceCategory.defaultMarkup;
+            }
+
+            if (targetMarkup === undefined || targetMarkup === null) {
+                skipCount++;
+                return;
+            }
+
+            // Calculando novo preco (partnerPayout + targetMarkup como percentual)
+            const payout = service.partnerPayout || service.price || 0;
+            const calculatedPrice = payout * (1 + targetMarkup / 100);
+
+            const updated = await prisma.partnerService.update({
+                where: { id: service.id },
+                data: {
+                    doctonFeePercent: targetMarkup,
+                    price: calculatedPrice,
+                    basePrice: calculatedPrice
+                },
+                include: {
+                    Partner: { select: { name: true } },
+                    ServiceCategory: { select: { name: true } }
+                }
+            });
+            
+            await syncPartnerServiceWithSupabase(updated, 'update');
+            syncCount++;
+        });
+
+        console.log(`[Prices] Synced markup to ${syncCount} services. Skipped ${skipCount}.`);
+
+        res.json({
+            data: {
+                success: true,
+                updated: syncCount,
+                skipped: skipCount,
+                message: `Markup sincronizado em ${syncCount} serviços`
+            }
+        });
+    } catch (error) {
+        console.error('Error syncing markup:', error);
+        res.status(500).json({ error: 'Falha ao sincronizar markup' });
+    }
+});
+
+// Sincronizar Classificações (Reajuste em Massa)
+router.post('/sync-classifications', async (req, res) => {
+    try {
+        const schema = z.object({
+            percent: z.preprocess((val) => Number(val), z.number()),
+        });
+
+        const { percent } = schema.parse(req.body);
+        console.log(`[Prices] Syncing classifications (percent=${percent}%)`);
+
+        const services = await prisma.partnerService.findMany();
+        
+        let syncCount = 0;
+
+        await processInChunks(services, 20, async (service) => {
+            const currentBase = service.basePrice ?? service.price ?? 0;
+            const newBasePrice = currentBase * (1 + percent / 100);
+            
+            const updated = await prisma.partnerService.update({
+                where: { id: service.id },
+                data: {
+                    basePrice: newBasePrice,
+                    // Atualizar price caso basePrice mude
+                    price: newBasePrice
+                },
+                include: {
+                    Partner: { select: { name: true } },
+                    ServiceCategory: { select: { name: true } }
+                }
+            });
+            
+            await syncPartnerServiceWithSupabase(updated, 'update');
+            syncCount++;
+        });
+
+        console.log(`[Prices] Synced classifications to ${syncCount} services`);
+
+        res.json({
+            data: {
+                success: true,
+                updated: syncCount,
+                message: `Reajuste aplicado a ${syncCount} serviços`
+            }
+        });
+    } catch (error) {
+        console.error('Error syncing classifications:', error);
+        res.status(500).json({ error: 'Falha ao aplicar reajuste em massa' });
     }
 });
 

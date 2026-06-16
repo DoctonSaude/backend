@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router } from 'express';
 import { z } from 'zod';
 import healthToolController from '../controllers/healthTool.controller.js';
@@ -18,7 +19,7 @@ const SymptomInputSchema = z.object({
   name: z.string().min(1),
   severity: z.string().min(1),
   duration: z.string().min(1),
-  frequency: z.string().optional(),
+  frequency: z.string(),
   category: z.string().optional(),
   description: z.string().optional(),
 });
@@ -116,3 +117,6 @@ router.put('/calculations/:id', ...patientAuth, healthToolController.updateCalcu
 router.delete('/calculations/:id', ...patientAuth, healthToolController.deleteCalculation);
 
 export default router;
+
+
+

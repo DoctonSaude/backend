@@ -1,0 +1,10 @@
+const fs = require('fs');
+let file = 'src/services/pharmacy-ai-demands.service.ts';
+let content = fs.readFileSync(file, 'utf8');
+content = content.replace(/\/\/ intent: \{/g, 'intent: {');
+content = content.replace(/\/\/ intent: string;/g, 'intent_type?: string;');
+content = content.replace(/\/\/ intent: intent.intent,/g, '/* intent */');
+content = content.replace(/\/\/ intent: 'ORDER',/g, '/* intent: ORDER */');
+content = content.replace(/\/\/ intent: 'QUOTE',/g, '/* intent: QUOTE */');
+content = content.replace(/\/\/ intent: \{/g, 'intent_type?: {');
+fs.writeFileSync(file, content);

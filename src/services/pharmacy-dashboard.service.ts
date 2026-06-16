@@ -67,7 +67,7 @@ export async function getPharmacyDashboardKpis(pharmacyId: string) {
     select: {
       responseTimeSec: true,
       createdAt: true,
-      quotation: { select: { createdAt: true } },
+      QuotationRequest: { select: { createdAt: true } },
     },
   });
 
@@ -77,7 +77,7 @@ export async function getPharmacyDashboardKpis(pharmacyId: string) {
     const sec =
       r.responseTimeSec ??
       Math.floor(
-        (r.createdAt.getTime() - r.quotation.createdAt.getTime()) / 1000
+        (r.createdAt.getTime() - r.QuotationRequest.createdAt.getTime()) / 1000
       );
     if (sec >= 0) {
       totalSec += sec;

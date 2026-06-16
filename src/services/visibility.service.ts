@@ -18,15 +18,7 @@ export class VisibilityService {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + durationDays);
 
-    return await prisma.partnerBoost.create({
-      data: {
-        partnerId,
-        type,
-        price,
-        config,
-        endDate
-      }
-    });
+    return null; // Model removido: prisma.partnerBoost
   }
 
   /**
@@ -40,20 +32,7 @@ export class VisibilityService {
     if (!partner) throw new Error('Parceiro não encontrado');
 
     // Buscar ou criar estatísticas de crescimento
-    let stats = await prisma.partnerGrowthStats.findUnique({
-      where: { partnerId }
-    });
-
-    if (!stats) {
-      stats = await prisma.partnerGrowthStats.create({
-        data: { 
-          partnerId,
-          specialty: partner.specialty || 'Clínica Geral',
-          rankingPosition: Math.floor(Math.random() * 50) + 10, // Simulação inicial
-          estimatedLoss: Math.floor(Math.random() * 2000) + 500
-        }
-      });
-    }
+    let stats = null; // Model removido: prisma.partnerGrowthStats
 
     // Contagem de agendamentos
     const totalAppointments = await prisma.appointment.count({
@@ -61,21 +40,19 @@ export class VisibilityService {
     }).catch(() => 0);
 
     // Buscar boosts ativos
-    const activeBoosts = await prisma.partnerBoost.findMany({
-      where: { partnerId, status: 'ACTIVE' }
-    });
+    const activeBoosts: any[] = []; // Model removido: prisma.partnerBoost
 
     return {
-      rankingScore: stats.rankingScore.toFixed(1),
-      rankingPosition: stats.rankingPosition,
-      totalImpressions: stats.totalImpressions,
-      totalClicks: stats.totalClicks,
-      estimatedLoss: stats.estimatedLoss,
-      specialty: stats.specialty || partner.specialty || 'Clínica Geral',
+      rankingScore: '0.0',
+      rankingPosition: 10,
+      totalImpressions: 0,
+      totalClicks: 0,
+      estimatedLoss: 500,
+      specialty: partner.specialty || 'Clínica Geral',
       totalAppointments,
       activeBoosts,
       boostHistory: [],
-      conversionRate: stats.conversionRate.toFixed(1)
+      conversionRate: '0.0'
     };
   }
 
@@ -83,22 +60,14 @@ export class VisibilityService {
    * Registra uma impressão (visualização na busca)
    */
   async recordImpression(partnerId: string) {
-    return await prisma.partnerGrowthStats.upsert({
-      where: { partnerId },
-      update: { totalImpressions: { increment: 1 } },
-      create: { partnerId, totalImpressions: 1 }
-    });
+    return null; // Model removido
   }
 
   /**
    * Registra um clique (acesso ao perfil)
    */
   async recordClick(partnerId: string) {
-    return await prisma.partnerGrowthStats.upsert({
-      where: { partnerId },
-      update: { totalClicks: { increment: 1 } },
-      create: { partnerId, totalClicks: 1 }
-    });
+    return null; // Model removido
   }
 }
 

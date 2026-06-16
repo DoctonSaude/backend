@@ -5,6 +5,14 @@ import sharp from 'sharp';
 import prisma from '../lib/prisma.js';
 import { PEDOMED_CONFIG } from '../config/pedomed.config.js';
 import { DrugMatchingService } from './drug-matching.service.js';
+import { ChatbotService } from './chatbot.service.js';
+import OpenAI from 'openai';
+
+function getOpenAI(): OpenAI | null {
+  const key = process.env.OPENAI_API_KEY;
+  if (key) return new OpenAI({ apiKey: key });
+  return null;
+}
 
 export class OCRService {
     drugMatchingService: DrugMatchingService;
@@ -43,6 +51,13 @@ export class OCRService {
             const { text, confidence } = await this.extractText(processedImageBuffer);
             // 5. Extrair medicamentos do texto
             const detectedDrugs = await this.extractDrugs(text);
+            
+            // 5.5 Ana IA (Interpretação Clínica Simplificada)
+            let anaInterpretation = null;
+            if (params.type === 'EXAM' || text.toLowerCase().includes('exame') || text.toLowerCase().includes('laudo')) {
+               anaInterpretation = await this.analyzeExamWithAna(text);
+            }
+
             // 6. Atualizar registro com resultados
             const processingTime = Date.now() - startTime;
             const updatedProcessing = await (prisma as any).oCRProcessing.update({
@@ -52,6 +67,10 @@ export class OCRService {
                     confidence,
                     processingTimeMs: processingTime,
                     status: 'COMPLETED',
+                    metadata: {
+                        ...ocrProcessing.metadata,
+                        anaInterpretation
+                    },
                     detectedDrugs: {
                         create: detectedDrugs
                     }
@@ -205,6 +224,33 @@ export class OCRService {
         const filePath = join(uploadsDir, finalFilename);
         await fs.writeFile(filePath, imageBuffer);
         return `/uploads/ocr/original/${finalFilename}`;
+    }
+
+    /**
+     * Ana IA: Analisa texto de exames/laudos
+     */
+    async analyzeExamWithAna(text: string) {
+        const openai = getOpenAI();
+        if (!openai) return { summary: "Análise Ana IA indisponível. OCR cru extraído.", alerts: [] };
+
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { 
+                        role: "system", 
+                        content: "Você é Ana, a IA Especialista Clínica da Docton Saúde. Seu papel é receber textos OCR de exames e laudos, identificar valores anormais críticos e resumir de forma que um médico possa bater o olho e entender. Retorne um JSON com { summary: string, alerts: string[] }." 
+                    },
+                    { role: "user", content: `Analise este texto de exame:\n${text.substring(0, 3000)}` }
+                ],
+                response_format: { type: "json_object" }
+            });
+
+            return JSON.parse(response.choices[0]?.message?.content || '{}');
+        } catch (e) {
+            console.error("[OCRService] Erro na Ana IA:", e);
+            return { summary: "Erro ao processar análise da Ana IA.", alerts: [] };
+        }
     }
 
     /**

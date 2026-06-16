@@ -285,7 +285,9 @@ router.get('/fidelity', authenticate, authorize('PATIENT'), async (req, res) => 
     const personId = req.user?.personId;
     const patient = await ensurePatient(userId, personId);
     return res.json({
-      points: patient.experiencePoints || patient.healthPoints || 0
+      points: patient.healthPoints || 0,
+      xp: patient.experiencePoints || 0,
+      level: patient.fidelityTier || 'BRONZE'
     });
   } catch (error) {
     console.error('[Fidelidade] Erro:', error);

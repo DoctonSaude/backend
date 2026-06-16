@@ -24,7 +24,7 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 export interface CompanyData {
   name: string;
-  tenantId: string;
+  economicGroupId: string;
   cnpj?: string;
   description?: string;
   isActive?: boolean;
@@ -32,7 +32,7 @@ export interface CompanyData {
 
 export interface PharmacyData {
   name: string;
-  tenantId: string;
+  economicGroupId: string;
   cnpj?: string;
   address?: string;
   phone?: string;

@@ -45,7 +45,7 @@ router.post('/public-profile/photo', authenticate, authorize('PARTNER'), upload.
       prisma.partner.upsert({
         where: { userId },
         update: { photo: publicUrl },
-        create: { userId, photo: publicUrl, tenantId: req.user.tenantId || null }
+        create: { userId, photo: publicUrl, economicGroupId: req.user.economicGroupId || null }
       })
     ]);
 
@@ -100,6 +100,7 @@ router.get('/profile', authenticate, authorize('PARTNER'), async (req: any, res)
       rating: partner.rating || 5.0,
       totalReviews: partner.totalReviews || 0,
       photo: partner.photo || partner.User?.avatar || '',
+      settings: (partner as any).settings || {}
     });
   } catch (error) {
     console.error('[ProfileRoutes] Error:', error);

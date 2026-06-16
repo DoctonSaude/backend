@@ -8,12 +8,12 @@ export class HealthIntentService {
     try {
       const partner = await prisma.partner.findUnique({
         where: { id: partnerId },
-        select: { specialty: true, PartnerService: { select: { name: true } } }
+        select: { specialty: true, services: { select: { name: true } } }
       });
 
       if (!partner) return [];
 
-      const keywords = [partner.specialty, ...partner.PartnerService.map(s => s.name)].map(k => k.toLowerCase());
+      const keywords = [partner.specialty, ...partner.services.map(s => s.name)].map(k => k.toLowerCase());
 
       // Busca intenções recentes
       const intents = await prisma.healthIntent.findMany({

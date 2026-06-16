@@ -51,6 +51,7 @@ router.post('/services', authenticate, authorize('PARTNER'), async (req: any, re
         description: description || '',
         duration: Number(duration),
         price: Number(price),
+        partnerPayout: Number(price),
         basePrice: basePrice ? Number(basePrice) : Number(price),
         isOnline: !!isOnline,
         isPresencial: !!isPresencial,
@@ -89,6 +90,7 @@ router.put('/services/:serviceId', authenticate, authorize('PARTNER'), async (re
         name, description, category,
         duration: duration !== undefined ? Number(duration) : undefined,
         price: price !== undefined ? Number(price) : undefined,
+        partnerPayout: price !== undefined ? Number(price) : undefined,
         basePrice: basePrice !== undefined ? Number(basePrice) : undefined,
         isOnline: isOnline !== undefined ? !!isOnline : undefined,
         isPresencial: isPresencial !== undefined ? !!isPresencial : undefined,
@@ -167,6 +169,54 @@ router.get('/combos', authenticate, authorize('PARTNER'), async (req: any, res) 
     return res.json({ data: combos });
   } catch (error) {
     return res.json({ data: [] });
+  }
+});
+/**
+ * @route POST /api/partners/combos
+ */
+router.post('/combos', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findUnique({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    const { name, description, price, serviceIds } = req.body;
+
+    const combo = await prisma.combo.create({
+      data: {
+        partnerId: partner.id,
+        name,
+        description,
+        price: Number(price),
+        services: {
+          connect: (serviceIds || []).map((id: string) => ({ id }))
+        }
+      },
+      include: { services: true }
+    });
+
+    return res.status(201).json({ data: combo });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao criar combo' });
+  }
+});
+
+/**
+ * @route DELETE /api/partners/combos/:id
+ */
+router.delete('/combos/:id', authenticate, authorize('PARTNER'), async (req: any, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const partner = await prisma.partner.findUnique({ where: { userId }, select: { id: true } });
+    if (!partner) return res.status(404).json({ error: 'Parceiro não encontrado' });
+
+    await prisma.combo.delete({
+      where: { id: req.params.id, partnerId: partner.id }
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao excluir combo' });
   }
 });
 

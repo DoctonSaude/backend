@@ -26,7 +26,7 @@ export class QuotationService {
       data: {
         id: uuidv4(),
         updatedAt: new Date(),
-        patient: { connect: { id: data.patientId } },
+        Patient: { connect: { id: data.patientId } },
         type: data.type || 'MANUAL',
         urgency: data.urgency || 'NORMAL',
         genericPreference: data.genericPreference || 'ACCEPT',
@@ -58,9 +58,9 @@ export class QuotationService {
       where: { patientId },
       include: {
         QuotationRequestItem: true,
-        responses: {
+        QuotationResponse: {
           include: {
-            pharmacy: {
+            Pharmacy: {
               select: { reasonSocial: true, performanceScore: true }
             }
           }
@@ -78,10 +78,10 @@ export class QuotationService {
       },
       include: {
         QuotationPayment: true,
-        quotation: {
+        QuotationRequest: {
           include: {
             QuotationRequestItem: true,
-            patient: {
+            Patient: {
               include: {
                 User: { select: { name: true, phone: true, email: true } },
                 Person: { select: { name: true, phone: true } }
@@ -99,9 +99,9 @@ export class QuotationService {
       where: { id },
       include: {
         QuotationRequestItem: true,
-        responses: {
+        QuotationResponse: {
           include: {
-            pharmacy: {
+            Pharmacy: {
               select: { 
                 id: true, 
                 reasonSocial: true, 
@@ -124,13 +124,13 @@ export class QuotationService {
     return prisma.quotationRequest.findMany({
       where: {
         status: 'OPEN',
-        responses: {
+        QuotationResponse: {
           none: { pharmacyId }
         }
       },
       include: {
         QuotationRequestItem: true,
-        patient: {
+        Patient: {
           include: {
             Person: {
               select: { name: true }
@@ -188,7 +188,7 @@ export class QuotationService {
         } : undefined
       },
       include: {
-        pharmacy: { select: { reasonSocial: true } },
+        Pharmacy: { select: { reasonSocial: true } },
         QuotationResponseItem: true
       }
     });
@@ -235,7 +235,7 @@ export class QuotationService {
     return prisma.quotationResponse.findMany({
       where: { pharmacyId },
       include: {
-        quotation: {
+        QuotationRequest: {
           include: { QuotationRequestItem: true }
         },
         QuotationResponseItem: true
@@ -259,7 +259,7 @@ export class QuotationService {
     const quotation = await prisma.quotationRequest.findUnique({
       where: { id: params.quotationId },
       include: {
-        patient: {
+        Patient: {
           include: {
             Person: true,
             User: { select: { name: true, email: true } }
@@ -273,14 +273,14 @@ export class QuotationService {
 
     const response = await prisma.quotationResponse.findUnique({
       where: { id: params.responseId },
-      include: { pharmacy: true }
+      include: { Pharmacy: true }
     });
 
     if (!response) throw new Error('Proposta não encontrada');
     if (response.quotationId !== params.quotationId) throw new Error('Proposta não vinculada a esta cotação');
 
     // 2. Criar/Obter cliente no Asaas
-    const patient = quotation.patient;
+    const patient = quotation.Patient;
     const person = patient?.Person;
     const cpf = patient?.cpf || (person as any)?.cpf;
 
@@ -294,14 +294,14 @@ export class QuotationService {
     }
 
     const asaasCustomer = await asaasService.getOrCreateCustomer({
-      name: person?.name || (quotation.patient as any).User?.name || 'Paciente',
+      name: person?.name || (quotation.Patient as any).User?.name || 'Paciente',
       cpfCnpj: cpfClean,
-      email: (quotation.patient as any).User?.email || '',
+      email: (quotation.Patient as any).User?.email || '',
       mobilePhone: (person?.phone || '').replace(/\D/g, '')
     });
 
     // 3. Criar cobrança
-    const totalAmount = response.price + (response.pharmacy?.deliveryFee || 0);
+    const totalAmount = response.price + (response.Pharmacy?.deliveryFee || 0);
     const description = `Medicamentos: Ref #${quotation.id.slice(-8).toUpperCase()}`;
     const externalReference = `quotation_${quotation.id}`;
 

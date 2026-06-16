@@ -85,8 +85,9 @@ export class PharmacyService {
 
         return await prisma.patient.create({
             data: {
-                personId: user.personId,
-                tenantId: user.tenantId
+                User: { connect: { id: userId } },
+                Person: { connect: { id: user.personId } },
+                ...(user.economicGroupId ? { EconomicGroup: { connect: { id: user.economicGroupId } } } : {})
             }
         });
     }
@@ -104,8 +105,8 @@ export class PharmacyService {
     /**
      * Lista farmácias com seus inventários
      */
-    async listPharmacies(tenantId: string) {
-        return await PharmacyCrud.listByTenant(tenantId);
+    async listPharmacies(economicGroupId: string) {
+        return await PharmacyCrud.listByEconomicGroup(economicGroupId);
     }
 
     /**
@@ -241,3 +242,4 @@ export class PharmacyService {
 }
 
 export const pharmacyService = new PharmacyService();
+

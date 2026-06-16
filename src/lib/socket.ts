@@ -75,7 +75,7 @@ export class SocketService {
 
                     const dbUnavailable =
                         env.NODE_ENV === 'production' &&
-                        (msg.toLowerCase().includes('tenant or user not found') ||
+                        (msg.toLowerCase().includes('economicGroup or user not found') ||
                           msg.toLowerCase().includes('error querying the database') ||
                           code === 'P1001');
 

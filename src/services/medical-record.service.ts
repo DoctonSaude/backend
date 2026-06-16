@@ -21,9 +21,9 @@ export class MedicalRecordService {
             // @ts-ignore - Prisma schema mismatch
             const record = await tx.medicalRecord.create({
                 data: {
-                    appointmentId: params.appointmentId,
-                    patientId: params.patientId,
-                    partnerId: params.partnerId,
+                    appointment: { connect: { id: params.appointmentId } },
+                    patient: { connect: { id: params.patientId } },
+                    partner: { connect: { id: params.partnerId } },
                     diagnosis: params.diagnosis,
                     symptoms: params.symptoms,
                     treatment: params.treatment,
@@ -78,7 +78,7 @@ export class MedicalRecordService {
         const records = await prisma.medicalRecord.findMany({
             where: { patientId },
             include: {
-                partner: { include: { person: true } },
+                partner: { include: { Person: true } },
                 appointment: true
             },
             orderBy: { createdAt: 'desc' }

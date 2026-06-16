@@ -26,6 +26,8 @@ import lumaRoutes from './luma.routes';
 import validationRoutes from './validation.routes';
 import chatbotRoutes from './chatbot.routes';
 import contactsRoutes from './contacts.routes';
+import marketingRoutes from './marketing.routes';
+
 const router = Router();
 
 // ⚠️ IMPORTANTE: profileRoutes DEVE vir antes de transfersRoutes (sem prefixo),
@@ -57,5 +59,6 @@ router.use('/transfers', transfersRoutes); // Rota prefixada para transfers (rep
 router.use('/dev', devRoutes);
 router.use(chatbotRoutes);
 router.use(contactsRoutes);
+router.use(marketingRoutes);
 
 export default router;

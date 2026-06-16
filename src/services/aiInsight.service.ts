@@ -32,7 +32,7 @@ export class AiInsightService {
                     },
                     patientChallenges: {
                         where: { status: 'ACTIVE' },
-                        include: { challenge: true }
+                        include: { Challenge: true }
                     },
                     anamneses: {
                         orderBy: { date: 'desc' },

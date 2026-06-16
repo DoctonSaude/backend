@@ -55,19 +55,19 @@ export class GrowthController {
    */
   async createTemplate(req: Request, res: Response) {
     try {
-      const { name, category, type, objective, content } = req.body;
-      if (!name || !content) {
-        return res.status(400).json({ error: 'Nome e conteúdo são obrigatórios.' });
+      const { name, description, category, type, objective, baseContent } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: 'Nome é obrigatório.' });
       }
 
       const template = await prisma.campaignTemplate.create({
         data: {
           name,
+          description,
           category: category || 'Personalizada',
           type: type || 'WHATSAPP',
           objective: objective || 'RETENTION',
-          content,
-          baseContent: content,
+          baseContent: baseContent || '',
           isActive: true
         }
       });

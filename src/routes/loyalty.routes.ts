@@ -114,7 +114,7 @@ router.get('/me', authenticate, authorize('PATIENT'), async (req, res) => {
 
     const dbUnavailable =
       process.env.NODE_ENV === 'production' &&
-      (msg.toLowerCase().includes('tenant or user not found') ||
+      (msg.toLowerCase().includes('economicGroup or user not found') ||
         msg.toLowerCase().includes('error querying the database') ||
         code === 'P1001');
 

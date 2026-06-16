@@ -53,4 +53,44 @@ router.post('/challenges', ...adminAuth, async (req, res) => {
   }
 });
 
+/**
+ * @route PUT /api/admin/challenges/:id
+ */
+router.put('/challenges/:id', ...adminAuth, async (req, res) => {
+  try {
+    const b = req.body;
+    const updated = await prisma.challenge.update({
+      where: { id: req.params.id },
+      data: {
+        title: b.title,
+        description: b.description,
+        type: b.type,
+        points: b.points ? Number(b.points) : undefined,
+        category: b.category,
+        status: b.status,
+        isActive: b.status ? b.status === 'Ativo' : undefined,
+        sponsor: b.sponsor,
+        startDate: b.startDate ? new Date(b.startDate) : undefined,
+        endDate: b.endDate ? new Date(b.endDate) : undefined,
+      }
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar desafio' });
+  }
+});
+
+/**
+ * @route DELETE /api/admin/challenges/:id
+ * @desc Deleta um desafio do sistema (Forçando trigger no Railway)
+ */
+router.delete('/challenges/:id', ...adminAuth, async (req, res) => {
+  try {
+    await prisma.challenge.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao deletar desafio' });
+  }
+});
+
 export default router;
