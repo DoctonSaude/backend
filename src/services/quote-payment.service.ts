@@ -10,8 +10,7 @@ export class QuotePaymentService {
         // 1. Validar cotação
         const quote = await (prisma as any).quotationRequest.findUnique({
             where: { id: quoteId },
-            include: {
-                Patient: true,
+            include: { patient: true,
                 QuotationResponse: {
                     include: {
                         Pharmacy: true

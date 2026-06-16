@@ -266,7 +266,7 @@ router.get('/evaluations/pending', authenticate, authorize('PATIENT'), async (re
           review: { isNot: null }
         }
       },
-      include: { Partner: { 
+      include: { partner: { 
           include: {
             User: { select: { name: true, avatar: true } }
           }
@@ -306,7 +306,7 @@ router.get('/evaluations/history', authenticate, authorize('PATIENT'), async (re
       where: { patientId: patient.id },
       include: {
         appointment: {
-          include: { Partner: {
+          include: { partner: {
               include: {
                 User: { select: { name: true, avatar: true } }
               }
@@ -483,13 +483,13 @@ router.post('/appointments', authenticate, authorize('PATIENT'), async (req, res
     // Criar agendamento
     const appointment = await prisma.appointment.create({
       data: {
-        Patient: { connect: { id: patient.id } },
-        Partner: { connect: { id: partner.id } },
+        patient: { connect: { id: patient.id } },
+        partner: { connect: { id: partner.id } },
         dateTime: new Date(dateTime),
         notes: notes || '',
         status: 'SCHEDULED'
       },
-      include: { Partner: {
+      include: { partner: {
           select: { id: true, name: true, specialty: true }
         }
       }
@@ -512,7 +512,7 @@ router.get('/appointments', authenticate, authorize('PATIENT'), async (req, res)
 
     const appointments = await prisma.appointment.findMany({
       where: { patientId: patient.id },
-      include: { Partner: {
+      include: { partner: {
           include: {
             User: { select: { name: true, avatar: true } }
           }
@@ -561,7 +561,7 @@ router.put('/appointments/:id/confirm', authenticate, authorize('PATIENT'), asyn
     const updated = await prisma.appointment.update({
       where: { id },
       data: { status: 'CONFIRMED' },
-      include: { Partner: { include: { User: true } } }
+      include: { partner: { include: { User: true } } }
     });
 
     // Notificar o parceiro
@@ -603,7 +603,7 @@ router.put('/appointments/:id/cancel', authenticate, authorize('PATIENT'), async
     const updated = await prisma.appointment.update({
       where: { id },
       data: { status: 'CANCELLED', notes: reason ? `Cancelado: ${reason}` : undefined },
-      include: { Partner: { include: { User: true } } }
+      include: { partner: { include: { User: true } } }
     });
 
     // Notificar o parceiro
@@ -649,7 +649,7 @@ router.put('/appointments/:id/reschedule', authenticate, authorize('PATIENT'), a
         status: 'SCHEDULED', // Volta para agendado para o parceiro confirmar se quiser, ou mantém como solicitado
         notes: appointment.notes ? `${appointment.notes} | Solicitação de reagendamento para ${new Date(dateTime).toLocaleString('pt-BR')}` : `Solicitação de reagendamento para ${new Date(dateTime).toLocaleString('pt-BR')}`
       },
-      include: { Partner: { include: { User: true } } }
+      include: { partner: { include: { User: true } } }
     });
 
     // Notificar o parceiro
@@ -2949,7 +2949,7 @@ router.post('/checkout', authenticate, authorize('PATIENT'), async (req, res, ne
           notes: `Aguardando pagamento via ${gatewayMethod}`,
           updatedAt: new Date(),
         },
-        include: { Partner: { include: { User: { select: { name: true } } } } },
+        include: { partner: { include: { User: { select: { name: true } } } } },
       });
 
       // Atualizar solicitação de disponibilidade original
@@ -3364,7 +3364,7 @@ router.get('/pharmacy/quotations', authenticate, authorize('PATIENT'), async (re
         QuotationRequestItem: true,
         QuotationResponse: {
           include: {
-            Pharmacy: {
+            pharmacy: {
               select: {
                 id: true,
                 name: true,
@@ -3535,14 +3535,14 @@ router.get('/pharmacy/promotions', authenticate, authorize('PATIENT'), async (re
         isActive: true,
         startDate: { lte: now },
         endDate: { gte: now },
-        Pharmacy: {
+        pharmacy: {
           isActive: true,
           isApproved: true,
           ...(city ? { city: { contains: city, mode: 'insensitive' } } : {}),
         },
       },
       include: {
-        Pharmacy: {
+        pharmacy: {
           select: {
             id: true,
             name: true,
@@ -3580,7 +3580,7 @@ router.get('/pharmacy/promotions/:id', authenticate, authorize('PATIENT'), async
         endDate: { gte: now },
       },
       include: {
-        Pharmacy: {
+        pharmacy: {
           select: {
             id: true,
             name: true,
@@ -3628,7 +3628,7 @@ router.post('/pharmacy/promotions/:id/request-quote', authenticate, authorize('P
         startDate: { lte: now },
         endDate: { gte: now },
       },
-      include: { Pharmacy: { include: { User: { select: { id: true } } } } },
+      include: { pharmacy: { include: { User: { select: { id: true } } } } },
     });
 
     if (!promotion?.Pharmacy) {

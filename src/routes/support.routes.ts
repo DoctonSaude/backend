@@ -36,7 +36,7 @@ router.get('/', authenticate, async (req, res) => {
         const tickets = await prisma.supportTicket.findMany({
         where,
         include: {
-          SupportMessage: {
+          messages: {
             orderBy: { createdAt: 'asc' }
           }
         },
@@ -93,7 +93,7 @@ router.post('/', authenticate, async (req, res) => {
         const ticket = await prisma.supportTicket.create({
             data: {
                 ...ticketData,
-                SupportMessage: {
+                messages: {
                     create: {
                         message,
                         sender: userRole === 'ADMIN' ? 'SUPPORT' : 'PATIENT',
@@ -101,7 +101,7 @@ router.post('/', authenticate, async (req, res) => {
                 }
             },
             include: {
-                SupportMessage: true
+                messages: true
             }
         });
 
@@ -135,7 +135,7 @@ router.get('/:id', authenticate, async (req, res) => {
         const ticket = await prisma.supportTicket.findUnique({
         where: { id },
         include: {
-          SupportMessage: {
+          messages: {
             orderBy: { createdAt: 'asc' }
           }
         }

@@ -52,8 +52,7 @@ export class PaymentService {
             where: { txId },
             include: {
                 appointment: {
-                    include: {
-                        Partner: {
+                    include: { partner: {
                             include: {
                                 Person: true
                             }

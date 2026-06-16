@@ -63,7 +63,7 @@ export async function onHealthLogCreated(healthLog: HealthLogData) {
 /**
  * Disparar webhook quando desafio é completado
  */
-export async function onChallengeCompleted(patientChallenge: PatientChallengeData) {
+export async function onChallengeCompleted(patientchallenge: PatientChallengeData) {
     await webhookService.trigger('challenge.completed', {
         id: patientChallenge.id,
         patientId: patientChallenge.patientId,

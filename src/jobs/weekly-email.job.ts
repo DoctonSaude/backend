@@ -52,7 +52,7 @@ export const startWeeklyEmailJob = () => {
             healthPoints: patient.healthPoints,
             level: patient.level,
             currentStreak: patient.currentStreak,
-            featuredChallenge: featuredChallenge || undefined,
+            featuredchallenge: featuredChallenge || undefined,
             recommendedChallenges: recommended.slice(0, 3),
             weeklyProgress,
             completedChallenges: patient.patientChallenges.filter(

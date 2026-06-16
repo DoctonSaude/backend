@@ -139,8 +139,7 @@ router.get('/', async (req, res) => {
         try {
             // First attempt with Partner include
             services = await prisma.partnerService.findMany({
-                include: {
-                    Partner: {
+                include: { partner: {
                         select: { name: true }
                     }
                 },
@@ -221,8 +220,7 @@ router.post('/', async (req, res) => {
                 appointments: 0,
                 serviceCategoryId: data.serviceCategoryId
             },
-            include: {
-                Partner: { select: { name: true } },
+            include: { partner: { select: { name: true } },
                 ServiceCategory: { select: { name: true } }
             }
         });
@@ -280,8 +278,7 @@ router.put('/:id', async (req, res) => {
         const service = await prisma.partnerService.update({
             where: { id },
             data: updateData,
-            include: {
-                Partner: { select: { name: true } },
+            include: { partner: { select: { name: true } },
                 ServiceCategory: { select: { name: true } }
             }
         });
@@ -348,8 +345,7 @@ router.post('/sync-discounts', async (req, res) => {
             const updated = await prisma.partnerService.update({
                 where: { id: service.id },
                 data: updateData,
-                include: {
-                    Partner: { select: { name: true } },
+                include: { partner: { select: { name: true } },
                     ServiceCategory: { select: { name: true } }
                 }
             });
@@ -415,8 +411,7 @@ router.post('/sync-markup', async (req, res) => {
                     price: calculatedPrice,
                     basePrice: calculatedPrice
                 },
-                include: {
-                    Partner: { select: { name: true } },
+                include: { partner: { select: { name: true } },
                     ServiceCategory: { select: { name: true } }
                 }
             });
@@ -466,8 +461,7 @@ router.post('/sync-classifications', async (req, res) => {
                     // Atualizar price caso basePrice mude
                     price: newBasePrice
                 },
-                include: {
-                    Partner: { select: { name: true } },
+                include: { partner: { select: { name: true } },
                     ServiceCategory: { select: { name: true } }
                 }
             });

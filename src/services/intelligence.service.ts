@@ -67,8 +67,7 @@ export class IntelligenceService {
             where: { id: userId },
             include: {
                 Person: {
-                    include: {
-                        Patient: {
+                    include: { patient: {
                             include: {
                                 healthLogs: { take: 5, orderBy: { logDate: 'desc' } },
                                 wearableConnections: true
@@ -196,8 +195,7 @@ export class IntelligenceService {
             where: { id: userId },
             include: { 
                 Person: { 
-                    include: { 
-                        Patient: { 
+                    include: { patient: { 
                             include: { 
                                 MedicationSubscription: true 
                             } 

@@ -59,7 +59,7 @@ export class ReportGeneratorService {
                         dateTime: baseDateFilter,
                         ...(filters.status && { status: filters.status })
                     },
-                    include: { Patient: { include: { User: true } } },
+                    include: { patient: { include: { User: true } } },
                     orderBy: { dateTime: 'desc' }
                 });
                 rows = appointments.map(a => [

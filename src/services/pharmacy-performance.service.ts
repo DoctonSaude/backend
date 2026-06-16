@@ -10,8 +10,7 @@ export class PharmacyPerformanceService {
             where: { id: pharmacyId },
             include: {
                 User: {
-                    include: {
-                        Partner: {
+                    include: { partner: {
                             include: {
                                 subscription: {
                                     include: { plan: true }

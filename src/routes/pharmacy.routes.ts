@@ -534,7 +534,7 @@ router.post('/quotations/:id/respond', ...pharmacyAuth, async (req, res) => {
     try {
       const quotation = await prisma.quotationRequest.findUnique({
         where: { id },
-        include: { Patient: { select: { userId: true } } }
+        include: { patient: { select: { userId: true } } }
       });
       if (quotation?.Patient?.userId) {
         SocketService.sendToUser(quotation.Patient.userId, 'pharmacyQuoteUpdate', {
@@ -775,7 +775,7 @@ router.get('/orders/delivery', ...pharmacyAuth, async (req, res) => {
       },
       include: {
         QuotationRequest: {
-          include: { Patient: {
+          include: { patient: {
               select: {
                 User: { select: { name: true, phone: true } },
                 address: true,
@@ -1182,7 +1182,7 @@ router.put('/orders/:id/status', ...pharmacyAuth, async (req, res) => {
       where: { id },
       include: {
         QuotationRequest: {
-          include: { Patient: { select: { userId: true } },
+          include: { patient: { select: { userId: true } },
           },
         },
       },
@@ -1799,7 +1799,7 @@ router.get('/crm/customers', ...pharmacyAuth, async (req, res) => {
       where: { pharmacyId: pharmacy.id, status: { in: ['ACCEPTED', 'RECEIVED', 'SEPARATING', 'DELIVERING', 'FINISHED'] } },
       include: {
         QuotationRequest: {
-          include: { Patient: {
+          include: { patient: {
               select: {
                 id: true,
                 User: { select: { name: true, phone: true } },

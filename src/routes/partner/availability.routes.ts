@@ -92,8 +92,7 @@ router.get('/availability', authenticate, async (req: any, res) => {
 
     const requests = await prisma.availabilityRequest.findMany({
       where,
-      include: {
-        Patient: { include: { User: { select: { name: true, avatar: true } } } },
+      include: { patient: { include: { User: { select: { name: true, avatar: true } } } },
         Partner: {
           include: {
             User: { select: { name: true, avatar: true } },
@@ -129,7 +128,7 @@ router.put('/availability/:id', authenticate, authorize('PARTNER'), async (req: 
 
     const request = await prisma.availabilityRequest.findUnique({
       where: { id },
-      include: { Patient: { include: { User: true } } }
+      include: { patient: { include: { User: true } } }
     });
 
     if (!request) return res.status(404).json({ error: 'Solicitação não encontrada' });

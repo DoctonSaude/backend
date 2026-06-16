@@ -235,8 +235,7 @@ router.get('/patients', authenticate, authorize('PARTNER'), async (req: any, res
 
     const appointments = await prisma.appointment.findMany({
       where: { partnerId: partner.id },
-      include: {
-        Patient: {
+      include: { patient: {
           include: {
             User: { select: { name: true, email: true, phone: true, avatar: true } }
           }
@@ -367,8 +366,7 @@ router.get('/validation-codes/logs', authenticate, authorize('PARTNER'), async (
         orderBy: { timestamp: 'desc' },
         skip,
         take: Number(pageSize),
-        include: {
-          Patient: { include: { User: { select: { name: true, avatar: true } } } }
+        include: { patient: { include: { User: { select: { name: true, avatar: true } } } }
         }
       })
     ]);

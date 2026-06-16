@@ -243,7 +243,7 @@ router.get('/ai/inactive-patients', authenticate, authorize('PARTNER'), async (r
         status: 'COMPLETED'
       },
       distinct: ['patientId'],
-      include: { Patient: true },
+      include: { patient: true },
       take: 10
     });
 

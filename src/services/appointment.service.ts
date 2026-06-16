@@ -46,8 +46,8 @@ export class AppointmentService {
         // 4. Criar o agendamento (Pendente de pagamento se necessário)
         const appointment = await prisma.appointment.create({
             data: {
-                Patient: { connect: { id: params.patientId } },
-                Partner: { connect: { id: params.partnerId } },
+                patient: { connect: { id: params.patientId } },
+                partner: { connect: { id: params.partnerId } },
                 dateTime: params.dateTime,
                 duration: params.duration,
                 ...(params.roomId ? { Room: { connect: { id: params.roomId } } } : {}),

@@ -269,8 +269,7 @@ router.get('/patient', authenticate, authorize('PATIENT'), async (req, res) => {
             },
           ],
         },
-        include: {
-          Partner: {
+        include: { partner: {
             include: { User: { select: { name: true, avatar: true } } },
           },
         },
@@ -287,8 +286,7 @@ router.get('/patient', authenticate, authorize('PATIENT'), async (req, res) => {
             },
           ],
         },
-        include: {
-          Partner: {
+        include: { partner: {
             include: { User: { select: { name: true, avatar: true } } },
           },
         },

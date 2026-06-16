@@ -147,8 +147,7 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
                         }
                     ]
                 },
-                include: {
-                    Partner: { select: { consultationPrice: true } }
+                include: { partner: { select: { consultationPrice: true } }
                 }
             });
 

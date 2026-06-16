@@ -280,7 +280,7 @@ export class SentinelaService {
     const patient = await prisma.patient.findUnique({
       where: { id: patientId },
       include: {
-        PatientChallenge: true,
+        Patientchallenge: true,
         PointsHistory: true,
         Appointment: true
       }
@@ -594,9 +594,9 @@ export class WearablesPilotService {
       const patient = await prisma.patient.findFirst({
         where: { userId },
         include: {
-          PatientChallenge: {
+          Patientchallenge: {
             where: { status: 'ACTIVE' },
-            include: { Challenge: true }
+            include: { challenge: true }
           }
         }
       });

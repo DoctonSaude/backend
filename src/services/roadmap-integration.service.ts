@@ -39,7 +39,7 @@ export interface CustomerVoiceInitiative {
   actualValue?: number;
   
   // Comunicação
-  communicationPlan: {
+  communicationplan: {
     channels: ('email' | 'in-app' | 'release-notes' | 'social')[];
     message: string;
     scheduledDate: string;
@@ -477,7 +477,7 @@ Após implementação:
         createdAt: '2024-10-15T10:00:00Z',
         dueDate: '2024-10-25T23:59:59Z',
         successMetric: 'Zero reports de bug de login por 30 dias',
-        communicationPlan: {
+        communicationplan: {
           channels: ['email', 'in-app'],
           message: 'Corrigimos os problemas de login reportados por vocês!',
           scheduledDate: '2024-10-26T09:00:00Z'

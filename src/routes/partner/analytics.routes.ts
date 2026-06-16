@@ -54,13 +54,13 @@ router.get('/dashboard', authenticate, authorize('PARTNER'), async (req: any, re
         where: { partnerId: partner.id },
         orderBy: { dateTime: 'desc' },
         take: 5,
-        include: { Patient: { include: { User: { select: { name: true, avatar: true } } } } }
+        include: { patient: { include: { User: { select: { name: true, avatar: true } } } } }
       }),
       prisma.validationCodeLog.findMany({
         where: { partnerId: partner.id },
         orderBy: { timestamp: 'desc' },
         take: 10,
-        include: { Patient: { select: { User: { select: { name: true, avatar: true } } } } }
+        include: { patient: { select: { User: { select: { name: true, avatar: true } } } } }
       })
     ]);
 

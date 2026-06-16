@@ -83,7 +83,7 @@ router.post('/payment', async (req, res) => {
       include: {
         QuotationRequest: true,
         QuotationResponse: {
-          include: { Pharmacy: { include: { User: true } } }
+          include: { pharmacy: { include: { User: true } } }
         }
       }
     });
@@ -130,7 +130,7 @@ router.post('/payment', async (req, res) => {
 
           const appointment = await tx.appointment.findUnique({
             where: { id: pendingCharge.appointmentId },
-            include: { Partner: { select: { userId: true, name: true } } },
+            include: { partner: { select: { userId: true, name: true } } },
           });
 
           if (appointment?.Partner?.userId) {

@@ -272,7 +272,7 @@ router.get('/finance/overview', ...adminAuth, async (req, res) => {
 // --- Transfers (Repasses) ---
 router.get('/transfers', ...adminAuth, async (req, res) => {
   try {
-    const transfers = await prisma.transfer.findMany({ include: { Partner: true } });
+    const transfers = await prisma.transfer.findMany({ include: { partner: true } });
     res.json({ items: transfers, total: transfers.length, page: 1, pageSize: 10 });
   } catch (error) {
     console.error('Error fetching transfers:', error);
@@ -354,7 +354,7 @@ router.get('/financial/accounts/summary', ...adminAuth, async (req, res) => {
     // Get pending transactions for accounts receivable/payable
     const pendingTransactions = await prisma.transaction.findMany({
       where: { ...where, status: 'PENDING' },
-      include: { Partner: true }
+      include: { partner: true }
     });
 
     const receivable = pendingTransactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
@@ -506,8 +506,7 @@ router.get('/financial/dre/report', ...adminAuth, async (req, res) => {
 router.get('/finance/payouts', ...adminAuth, async (req, res) => {
   try {
     const transfers = await prisma.transfer.findMany({
-      include: {
-        Partner: {
+      include: { partner: {
           include: {
             User: true
           }

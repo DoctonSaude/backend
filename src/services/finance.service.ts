@@ -35,8 +35,7 @@ export class FinanceService {
   async processAppointmentCompletion(appointmentId: string) {
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      include: { 
-        Patient: { include: { User: { select: { name: true, id: true } } } },
+      include: { patient: { include: { User: { select: { name: true, id: true } } } },
         Partner: { select: { consultationPrice: true } }
       }
     });

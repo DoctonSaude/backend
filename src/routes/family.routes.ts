@@ -40,8 +40,7 @@ router.get('/me', authenticate, authorize('PATIENT'), async (req: any, res: any)
         familyRole: true,
         planType: true,
         FamilyGroup: {
-          include: {
-            Patient: {
+          include: { patient: {
               include: {
                 User: {
                   select: {
@@ -118,12 +117,10 @@ router.post('/', authenticate, authorize('PATIENT'), async (req: any, res: any) 
         name: familyGroupName,
         ownerId: patient.id,
         updatedAt: new Date(),
-        Patient: {
-          connect: { id: patient.id },
+        patient: { connect: { id: patient.id },
         },
       },
-      include: {
-        Patient: {
+      include: { patient: {
           include: {
             User: { select: { name: true, email: true, avatar: true, id: true } },
           },
@@ -177,8 +174,7 @@ const inviteMemberHandler = async (req: any, res: any) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { email },
-      include: {
-        Patient: { select: { id: true, familyGroupId: true, userId: true } },
+      include: { patient: { select: { id: true, familyGroupId: true, userId: true } },
       },
     });
 

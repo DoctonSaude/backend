@@ -274,7 +274,7 @@ export class GrowthEngineService {
   static async executeCampaign(campaignId: string) {
     const campaign = await prisma.marketingCampaign.findUnique({
       where: { id: campaignId },
-      include: { Partner: true }
+      include: { partner: true }
     });
 
     if (!campaign || campaign.status !== 'ACTIVE') return;

@@ -137,8 +137,7 @@ router.put('/users/:id', ...adminAuth, async (req, res) => {
     const updated = await prisma.user.update({
       where: { id: req.params.id },
       data: update,
-      include: {
-        Patient: true,
+      include: { patient: true,
         Partner: true
       }
     });

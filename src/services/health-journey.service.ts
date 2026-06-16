@@ -104,8 +104,7 @@ export class HealthJourneyService {
     async processPatientInteractions(patientId: string) {
         const patient = await prisma.patient.findUnique({
             where: { id: patientId },
-            include: {
-                Appointment: true,
+            include: { appointment: true,
                 medicalRecords: true,
                 healthExams: true,
                 MedicationLog: true

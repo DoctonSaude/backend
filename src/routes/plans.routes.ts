@@ -294,15 +294,14 @@ router.get('/activity', authenticate, authorize('ADMIN'), async (req, res) => {
                 skip,
                 take,
                 orderBy: { createdAt: 'desc' },
-                include: {
-                    Patient: {
+                include: { patient: {
                         include: {
                             User: {
                                 select: { name: true, email: true }
                             }
                         }
                     },
-                    Plan: { select: { name: true } }
+                    plan: { select: { name: true } }
                 }
             }),
             prisma.subscription.count({ where })

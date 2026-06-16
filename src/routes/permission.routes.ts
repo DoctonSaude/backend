@@ -154,8 +154,7 @@ router.post('/request', authenticate, async (req, res, next) => {
                     institution: professional.institution || undefined,
                 },
             },
-            include: {
-                Partner: {
+            include: { partner: {
                     select: { name: true, crm: true, specialty: true, institution: true },
                 },
             },
@@ -199,8 +198,7 @@ router.get('/patient', authenticate, authorize('PATIENT'), async (req, res, next
         const permissions = await prisma.medicalRecordPermission.findMany({
             where: { patientId: patient.id },
             orderBy: { requestedAt: 'desc' },
-            include: {
-                Partner: {
+            include: { partner: {
                     select: { name: true, crm: true, specialty: true, institution: true },
                 },
             },
@@ -220,7 +218,7 @@ router.post('/:id/respond', authenticate, authorize('PATIENT'), async (req, res,
 
         const permission = await prisma.medicalRecordPermission.findUnique({
             where: { id: permissionId },
-            include: { Patient: true, Partner: { select: { name: true, crm: true, specialty: true, institution: true } } },
+            include: { patient: true, Partner: { select: { name: true, crm: true, specialty: true, institution: true } } },
         });
 
         if (!permission) {
@@ -249,8 +247,7 @@ router.post('/:id/respond', authenticate, authorize('PATIENT'), async (req, res,
                     ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
                     : permission.expiresAt,
             },
-            include: {
-                Partner: {
+            include: { partner: {
                     select: { name: true, crm: true, specialty: true, institution: true },
                 },
             },
@@ -283,7 +280,7 @@ router.post('/:id/revoke', authenticate, authorize('PATIENT'), async (req, res, 
 
         const permission = await prisma.medicalRecordPermission.findUnique({
             where: { id: permissionId },
-            include: { Patient: true, Partner: { select: { name: true, crm: true, specialty: true, institution: true } } },
+            include: { patient: true, Partner: { select: { name: true, crm: true, specialty: true, institution: true } } },
         });
 
         if (!permission) {
@@ -309,8 +306,7 @@ router.post('/:id/revoke', authenticate, authorize('PATIENT'), async (req, res, 
                 patientResponse: JSON.stringify(patientResponsePayload),
                 patientResponseJson: patientResponsePayload,
             },
-            include: {
-                Partner: {
+            include: { partner: {
                     select: { name: true, crm: true, specialty: true, institution: true },
                 },
             },

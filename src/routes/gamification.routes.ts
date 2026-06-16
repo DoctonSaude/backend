@@ -92,7 +92,7 @@ router.get('/my-challenges', authenticate, authorize('PATIENT'), async (req: any
     const my = await prisma.patientChallenge.findMany({
       where: { patientId: patient.id },
       orderBy: { updatedAt: 'desc' },
-      include: { Challenge: true }
+      include: { challenge: true }
     });
     
     // Mapear para o formato que o frontend espera
@@ -262,7 +262,7 @@ router.post('/challenges/:challengeId/progress', authenticate, authorize('PATIEN
           createdBadges.push(badge);
         }
       }
-      return res.json({ message: 'Desafio completado!', patientChallenge: completed, pointsEarned, newBadges: createdBadges });
+      return res.json({ message: 'Desafio completado!', patientchallenge: completed, pointsEarned, newBadges: createdBadges });
     }
     return res.json(completed);
   } catch (e) {
@@ -592,7 +592,7 @@ router.get('/timeline', authenticate, authorize('PATIENT'), async (req: any, res
       }),
       prisma.patientChallenge.findMany({
         where: { patientId: patient.id, status: 'COMPLETED' },
-        include: { Challenge: true },
+        include: { challenge: true },
         orderBy: { completedAt: 'desc' },
         take: 10
       })

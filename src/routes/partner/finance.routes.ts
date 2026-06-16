@@ -76,8 +76,7 @@ router.get('/finance/payments', authenticate, authorize('PARTNER'), async (req: 
         orderBy: { createdAt: 'desc' },
         skip,
         take: Number(pageSize),
-        include: {
-          Patient: { include: { User: { select: { name: true, avatar: true } } } }
+        include: { patient: { include: { User: { select: { name: true, avatar: true } } } }
         }
       })
     ]);
@@ -266,7 +265,7 @@ router.get('/finance/payments/:id/receipt', authenticate, authorize('PARTNER'), 
 
     const transaction = await prisma.transaction.findFirst({
       where: { id, partnerId: partner.id },
-      include: { Patient: { include: { User: { select: { name: true } } } } }
+      include: { patient: { include: { User: { select: { name: true } } } } }
     });
 
     if (!transaction) return res.status(404).json({ error: 'Transação não encontrada' });

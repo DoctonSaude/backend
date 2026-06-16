@@ -68,7 +68,7 @@ router.get('/gamification', authenticate, authorize('PATIENT'), async (req, res)
     console.log('[Gamification] Step 4: Querying patient challenges...');
     let patientChallenges = await prisma.patientChallenge.findMany({
       where: { patientId: patient.id },
-      include: { Challenge: true },
+      include: { challenge: true },
       orderBy: [{ createdAt: 'desc' }]
     });
     console.log('[Gamification] Step 5: Found patientChallenges count:', patientChallenges.length);
@@ -141,7 +141,7 @@ router.get('/gamification', authenticate, authorize('PATIENT'), async (req, res)
       console.log('[Gamification] Step 7: Re-querying patient challenges...');
       patientChallenges = await prisma.patientChallenge.findMany({
         where: { patientId: patient.id },
-        include: { Challenge: true },
+        include: { challenge: true },
         orderBy: [{ createdAt: 'desc' }]
       });
       console.log('[Gamification] Step 8: New patientChallenges count:', patientChallenges.length);
@@ -247,8 +247,8 @@ router.post('/gamification/checkin', authenticate, authorize('PATIENT'), async (
 
     // Marcar o desafio de check-in como concluído
     const checkinChallenge = await prisma.patientChallenge.findFirst({
-      where: { patientId: patient.id, Challenge: { type: 'checkin' } },
-      include: { Challenge: true }
+      where: { patientId: patient.id, challenge: { type: 'checkin' } },
+      include: { challenge: true }
     });
 
     if (checkinChallenge && checkinChallenge.status !== 'COMPLETED') {

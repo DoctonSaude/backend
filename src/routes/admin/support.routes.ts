@@ -34,7 +34,7 @@ router.get('/support/tickets', ...adminAuth, async (req, res) => {
           partnerId: true,
           createdAt: true,
           updatedAt: true,
-          SupportMessage: { orderBy: { createdAt: 'asc' } },
+          messages: { orderBy: { createdAt: 'asc' } },
           Patient: { select: { User: { select: { name: true, email: true } } } }
       },
       orderBy: { updatedAt: 'desc' }
@@ -109,7 +109,7 @@ router.get('/support/tickets/:id', ...adminAuth, async (req, res) => {
           partnerId: true,
           createdAt: true,
           updatedAt: true,
-          SupportMessage: { orderBy: { createdAt: 'asc' } },
+          messages: { orderBy: { createdAt: 'asc' } },
           Patient: { select: { User: { select: { name: true, email: true, phone: true } } } }
       }
     });
@@ -143,7 +143,7 @@ router.post('/support/tickets/:id/resolve', ...adminAuth, async (req, res) => {
       data: {
         status: 'RESOLVED',
         updatedAt: new Date(),
-        SupportMessage: {
+        messages: {
           create: {
             sender: 'SUPPORT',
             message: `Ticket resolvido: ${resolution || 'Questão solucionada pelo suporte.'}`,
@@ -320,7 +320,7 @@ router.post('/support/tickets', ...adminAuth, async (req, res) => {
         status: 'OPEN',
         userName: b.userName || 'Admin',
         userEmail: b.userEmail || '',
-        SupportMessage: {
+        messages: {
           create: {
             message: b.message || 'Ticket criado',
             sender: 'USER'

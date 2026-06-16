@@ -45,8 +45,7 @@ router.get('/quotes', ...adminAuth, async (req, res) => {
     const [quotes, availabilityRequests] = await Promise.all([
       prisma.quote.findMany({
         orderBy: { createdAt: 'desc' },
-        include: {
-          Patient: {
+        include: { patient: {
             select: {
               User: { select: { name: true, phone: true } }
             }
@@ -62,8 +61,7 @@ router.get('/quotes', ...adminAuth, async (req, res) => {
       }),
       prisma.availabilityRequest.findMany({
         orderBy: { createdAt: 'desc' },
-        include: {
-          Patient: {
+        include: { patient: {
              include: { User: true }
           },
           Partner: true
@@ -251,8 +249,7 @@ router.post('/quotes/:id/respond', ...adminAuth, async (req, res) => {
             price: (!isNaN(parseFloat(body.price)) ? parseFloat(body.price) : 0),
             updatedAt: new Date()
           },
-          include: { 
-            Patient: { select: { userId: true, id: true } },
+          include: { patient: { select: { userId: true, id: true } },
             Partner: { select: { name: true } }
           }
         });
@@ -448,8 +445,7 @@ router.get('/quotes/tasks', ...adminAuth, async (req, res) => {
             { crmNextContact: { not: null } }
           ]
         },
-        include: {
-          Patient: {
+        include: { patient: {
             include: { User: { select: { name: true, phone: true } } }
           },
           Partner: {
@@ -461,8 +457,7 @@ router.get('/quotes/tasks', ...adminAuth, async (req, res) => {
       }),
       prisma.availabilityRequest.findMany({
         where: { status: 'pending' },
-        include: {
-          Patient: {
+        include: { patient: {
             include: { User: { select: { name: true, phone: true } } }
           },
           Partner: {

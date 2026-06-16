@@ -44,8 +44,8 @@ async function main() {
 
       const appt = await (prisma as any).appointment.create({
         data: {
-          Partner: { connect: { id: partner.id } },
-          Patient: { connect: { id: patient.id } },
+          partner: { connect: { id: partner.id } },
+          patient: { connect: { id: patient.id } },
           dateTime: apptDate,
           status: status,
           duration: 30,
@@ -58,8 +58,8 @@ async function main() {
       if (status === 'COMPLETED') {
         const tx = await (prisma as any).transaction.create({
           data: {
-            Partner: { connect: { id: partner.id } },
-            Patient: { connect: { id: patient.id } },
+            partner: { connect: { id: partner.id } },
+            patient: { connect: { id: patient.id } },
             amount: amount * 0.85, // Líquido (desconto de 15% taxa)
             type: 'CREDIT',
             status: 'COMPLETED',
@@ -81,7 +81,7 @@ async function main() {
     // Criar um saque por mês
     await (prisma as any).transaction.create({
         data: {
-            Partner: { connect: { id: partner.id } },
+            partner: { connect: { id: partner.id } },
             amount: Math.floor(Math.random() * 500) + 200,
             type: 'DEBIT',
             status: 'COMPLETED',

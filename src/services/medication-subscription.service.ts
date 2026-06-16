@@ -74,7 +74,7 @@ function mapSubscription(row: {
 }
 
 const subscriptionInclude = {
-  Pharmacy: {
+  pharmacy: {
     select: { id: true, name: true, phone: true, city: true },
   },
 } as const;

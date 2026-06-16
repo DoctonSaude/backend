@@ -14,7 +14,7 @@ export class GrowthController {
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -37,7 +37,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -130,7 +130,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -155,7 +155,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -173,7 +173,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -206,7 +206,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -230,7 +230,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -271,7 +271,7 @@ export class GrowthController {
       
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
 
@@ -294,7 +294,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = user?.Partner?.id || user?.Pharmacy?.id;
@@ -315,7 +315,7 @@ export class GrowthController {
       const userId = req.user?.userId;
       const userFull = await prisma.user.findUnique({
         where: { id: userId },
-        include: { Partner: true, Pharmacy: true }
+        include: { partner: true, Pharmacy: true }
       });
 
       const partnerId = userFull?.Partner?.id || userFull?.Pharmacy?.id;
