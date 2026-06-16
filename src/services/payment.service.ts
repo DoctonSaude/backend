@@ -52,7 +52,7 @@ export class PaymentService {
             where: { txId },
             include: {
                 appointment: {
-                    include: { partner: {
+                    include: { Partner: {
                             include: {
                                 Person: true
                             }

@@ -65,7 +65,7 @@ router.get('/appointments', authenticate, authorize('PARTNER'), async (req, res)
 
     const appointments = await prisma.appointment.findMany({
       where,
-      include: { patient: { include: { User: { select: { name: true, email: true, avatar: true } } } },
+      include: { Patient: { include: { User: { select: { name: true, email: true, avatar: true } } } },
         TeamMember: true
       },
       orderBy: { dateTime: 'desc' }
@@ -95,7 +95,7 @@ router.get('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
 
     const appointment = await prisma.appointment.findFirst({
       where: { id, partnerId: partner.id },
-      include: { patient: { include: { User: { select: { name: true, email: true, avatar: true } } } } }
+      include: { Patient: { include: { User: { select: { name: true, email: true, avatar: true } } } } }
     });
 
     if (!appointment) return res.status(404).json({ error: 'Agendamento não encontrado' });
@@ -171,7 +171,7 @@ router.post('/appointments', authenticate, authorize('PARTNER'), async (req, res
         equipmentId: equipmentId || null,
         updatedAt: new Date()
       },
-      include: { patient: { include: { User: { select: { name: true, email: true, avatar: true } } } },
+      include: { Patient: { include: { User: { select: { name: true, email: true, avatar: true } } } },
         TeamMember: true
       }
     });
@@ -212,7 +212,7 @@ router.put('/appointments/:id', authenticate, authorize('PARTNER'), async (req, 
         roomId: roomId !== undefined ? (roomId || null) : undefined,
         equipmentId: equipmentId !== undefined ? (equipmentId || null) : undefined
       },
-      include: { patient: { include: { User: { select: { name: true, email: true, avatar: true } } } },
+      include: { Patient: { include: { User: { select: { name: true, email: true, avatar: true } } } },
         TeamMember: true
       }
     });
@@ -279,7 +279,7 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
     if (appointmentId) {
       appointment = await prisma.appointment.findFirst({
         where: { id: appointmentId, partnerId: partner.id },
-        include: { patient: { include: { User: { select: { name: true } } } } }
+        include: { Patient: { include: { User: { select: { name: true } } } } }
       });
       if (appointment) {
         if (appointment.status === 'COMPLETED') return res.json({ valid: false, message: 'Já validado.' });
@@ -295,7 +295,7 @@ router.post('/appointments/validate-code', authenticate, authorize('PARTNER'), a
           status: { in: ['SCHEDULED', 'CONFIRMED', 'active'] },
           id: { endsWith: searchCode, mode: 'insensitive' }
         },
-        include: { patient: { include: { User: { select: { name: true } } } } }
+        include: { Patient: { include: { User: { select: { name: true } } } } }
       });
     }
 
@@ -357,7 +357,7 @@ router.get('/medical-records/:appointmentId', authenticate, authorize('PARTNER')
 
     const record = await prisma.medicalRecord.findUnique({
       where: { appointmentId },
-      include: { patient: { include: { User: { select: { name: true, avatar: true } } } }, 
+      include: { Patient: { include: { User: { select: { name: true, avatar: true } } } }, 
         Appointment: true 
       }
     });

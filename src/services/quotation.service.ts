@@ -26,7 +26,7 @@ export class QuotationService {
       data: {
         id: uuidv4(),
         updatedAt: new Date(),
-        patient: { connect: { id: data.patientId } },
+        Patient: { connect: { id: data.patientId } },
         type: data.type || 'MANUAL',
         urgency: data.urgency || 'NORMAL',
         genericPreference: data.genericPreference || 'ACCEPT',
@@ -60,7 +60,7 @@ export class QuotationService {
         QuotationRequestItem: true,
         QuotationResponse: {
           include: {
-            pharmacy: {
+            Pharmacy: {
               select: { reasonSocial: true, performanceScore: true }
             }
           }
@@ -101,7 +101,7 @@ export class QuotationService {
         QuotationRequestItem: true,
         QuotationResponse: {
           include: {
-            pharmacy: {
+            Pharmacy: {
               select: { 
                 id: true, 
                 reasonSocial: true, 
@@ -188,7 +188,7 @@ export class QuotationService {
         } : undefined
       },
       include: {
-        pharmacy: { select: { reasonSocial: true } },
+        Pharmacy: { select: { reasonSocial: true } },
         QuotationResponseItem: true
       }
     });
@@ -258,7 +258,7 @@ export class QuotationService {
     // 1. Validar cotação e proposta
     const quotation = await prisma.quotationRequest.findUnique({
       where: { id: params.quotationId },
-      include: { patient: {
+      include: { Patient: {
           include: {
             Person: true,
             User: { select: { name: true, email: true } }
