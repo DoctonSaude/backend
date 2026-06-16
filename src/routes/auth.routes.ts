@@ -182,10 +182,10 @@ router.get('/validate', async (req: Request, res: Response, next: NextFunction) 
       try {
         const user = await prisma.user.findUnique({
           where: { id: userId },
-          include: { partner: {
+          include: { Partner: {
               select: { id: true, isApproved: true, type: true }
             },
-            pharmacy: {
+            Pharmacy: {
               select: { id: true, isApproved: true, reasonSocial: true, logo: true, name: true }
             },
             Patient: {
