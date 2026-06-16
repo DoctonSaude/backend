@@ -51,7 +51,7 @@ export const UserCrud = {
           Patient: {
             include: {
               subscriptions: {
-                include: { Plan: true },
+                include: { plan: true },
                 where: { status: 'ACTIVE' },
                 take: 1
               }
